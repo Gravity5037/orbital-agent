@@ -1,0 +1,1 @@
+@echo off\`nTITLE Orbital Nucleus OS\`necho Starting Nucleus Microkernel Engine...\`nstart /B C:\\Orbital\\Nucleus\\nucleus-engine.exe -m C:\\Orbital\\Nucleus\\model.gguf --port 11434 -c 4096\`ntimeout /t 2 &gt;nul\`necho Launching Orbital...\`nstart C:\\Orbital\\dist\\Orbital.exe
