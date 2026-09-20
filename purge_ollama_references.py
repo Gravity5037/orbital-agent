@@ -2,29 +2,29 @@ import os
 import glob
 import re
 
-def purge_ollama():
+def purge_nucleus():
     target_dir = r"C:\Orbital"
     if not os.path.exists(target_dir):
         target_dir = os.getcwd()
 
-    print(f"[*] Starting complete purge of Ollama references in: {target_dir}")
+    print(f"[*] Starting complete purge of Nucleus Engine references in: {target_dir}")
 
     # 1. Purge references in files
     file_extensions = ['.py', '.bat', '.vbs', '.json', '.rs', '.md', '.txt']
     
     replacements = [
-        ("check_ollama", "check_nucleus"),
-        ("OLLAMA_URL", "NUCLEUS_URL"),
-        ("OLLAMA_HOST", "NUCLEUS_HOST"),
-        ("OLLAMA_NO_GPU", "NUCLEUS_NO_GPU"),
-        ("ollama_blobs", "nucleus_blobs"),
-        ("ollama_process", "nucleus_process"),
-        ("ollama.exe", "llama-server.exe"),
-        ("ollama app.exe", "llama-server.exe"),
-        ("ollama serve", "llama-server.exe -m Nucleus\\model.gguf --port 11434"),
-        ("ollama", "nucleus"),
-        ("Ollama", "Nucleus Engine"),
-        ("OLLAMA", "NUCLEUS"),
+        ("check_nucleus", "check_nucleus"),
+        ("NUCLEUS_URL", "NUCLEUS_URL"),
+        ("NUCLEUS_HOST", "NUCLEUS_HOST"),
+        ("NUCLEUS_NO_GPU", "NUCLEUS_NO_GPU"),
+        ("nucleus_blobs", "nucleus_blobs"),
+        ("nucleus_process", "nucleus_process"),
+        ("llama-server.exe", "llama-server.exe"),
+        ("llama-server.exe", "llama-server.exe"),
+        ("llama-server.exe -m Nucleus\model.gguf --port 11434", "llama-server.exe -m Nucleus\\model.gguf --port 11434"),
+        ("nucleus", "nucleus"),
+        ("Nucleus Engine", "Nucleus Engine"),
+        ("NUCLEUS", "NUCLEUS"),
     ]
 
     purged_count = 0
@@ -144,7 +144,7 @@ if __name__ == "__main__":
 """
     with open(clean_chat_path, "w", encoding="utf-8") as f:
         f.write(clean_chat_code)
-    print("  [Created] Clean orbitalchat.py with ZERO Ollama code")
+    print("  [Created] Clean orbitalchat.py with ZERO Nucleus Engine code")
 
     # 3. Re-write clean LAUNCH_ORBITAL.bat
     launch_bat_path = os.path.join(target_dir, "LAUNCH_ORBITAL.bat")
@@ -171,9 +171,9 @@ if exist dist\\Orbital.exe (
 
     print("\n============================================================")
     print(" [✔] PURGE COMPLETE!")
-    print(" All references to 'Ollama' have been eliminated.")
+    print(" All references to 'Nucleus Engine' have been eliminated.")
     print(" Orbital is now 100% powered by the independent Nucleus engine.")
     print("============================================================")
 
 if __name__ == "__main__":
-    purge_ollama()
+    purge_nucleus()

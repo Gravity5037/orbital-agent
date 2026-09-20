@@ -1,1 +1,1 @@
-import os, shutil, glob; p = os.path.expanduser('\~/.ollama/models/blobs'); os.makedirs('Nucleus', exist\_ok=True); shutil.copy(max(glob.glob(p + '/\*'), key=os.path.getsize), 'Nucleus/model.gguf'); print('SUCCESS')
+import os, shutil, glob; p = os.path.expanduser('\~/.nucleus/models/blobs'); os.makedirs('Nucleus', exist\_ok=True); shutil.copy(max(glob.glob(p + '/\*'), key=os.path.getsize), 'Nucleus/model.gguf'); print('SUCCESS')

@@ -2,4 +2,5 @@ target/
 __pycache__/
 build/
 *.log
-*.spec
+*.specNucleus/*.gguf 
+*.gguf 

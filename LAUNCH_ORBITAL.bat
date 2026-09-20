@@ -1,23 +1,16 @@
 @echo off
-TITLE Orbital Agent - Laptop Launcher
+TITLE Orbital Nucleus Engine Launcher
 cls
-cd /d "%~dp0"
 echo ============================================================
-echo   ORBITAL AGENT — LAPTOP LAUNCHER
+echo   ORBITAL CORE v0.4.0 — NUCLEUS STANDALONE ENGINE
 echo ============================================================
-echo.
-echo [1/3] Setting CPU Mode (OLLAMA_NO_GPU=1)...
-setx OLLAMA_NO_GPU 1 >nul 2>&1
-set OLLAMA_NO_GPU=1
+echo [1/2] Starting Nucleus Local AI Engine (llama-server)...
+start /b "" llama-server.exe -m Nucleus\model.gguf --port 11434 -c 4096
 
-echo [2/3] Cleaning up existing processes and starting Ollama...
-taskkill /F /IM "ollama app.exe" >nul 2>&1
-taskkill /F /IM ollama.exe >nul 2>&1
+echo [2/2] Launching Orbital App...
 timeout /t 2 /nobreak >nul
-start "" ollama serve
-timeout /t 3 /nobreak >nul
-
-echo [3/3] Launching Orbital Chat...
-echo ------------------------------------------------------------
-python orbitalchat.py
-pause
+if exist dist\Orbital.exe (
+    start "" dist\Orbital.exe
+) else (
+    python orbitalchat.py
+)
