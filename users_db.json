@@ -1,0 +1,51 @@
+{
+    "users": {
+        "jay": {
+            "password": "Toolongdong!3",
+            "contact": "jaylevin7800@gmail.com",
+            "status": "active",
+            "created": "2026-09-22 01:05:58"
+        },
+        "jaybinky": {
+            "username": "jaybinky",
+            "password": "UserPass!1",
+            "contact": "instance@orbital.local",
+            "created": "2026-09-22T02:18:48.967091",
+            "status": "active",
+            "abilities": [
+                "Nucleus AI",
+                "Vision Camera",
+                "Mesh Gateway",
+                "Spatial CSI"
+            ]
+        },
+        "Sarah": {
+            "username": "Sarah",
+            "password": "UserPass!1",
+            "contact": "instance@orbital.local",
+            "created": "2026-09-22T00:00:00",
+            "status": "active",
+            "abilities": [
+                "Nucleus AI",
+                "Vision Camera",
+                "Mesh Gateway",
+                "Spatial CSI"
+            ]
+        }
+    },
+    "cooldowns": {
+        "Douglas": "2026-09-22T03:28:20.559252"
+    },
+    "Gravity": {
+        "passcode": "Toolongdong!3",
+        "role": "admin",
+        "abilities": [
+            "Nucleus AI Core",
+            "Vision & Camera",
+            "GibberLink Mesh",
+            "Wi-Fi CSI Spatial",
+            "Warden GRC"
+        ],
+        "status": "active"
+    }
+}
