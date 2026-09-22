@@ -4,7 +4,8 @@
             "password": "Toolongdong!3",
             "contact": "jaylevin7800@gmail.com",
             "status": "active",
-            "created": "2026-09-22 01:05:58"
+            "created": "2026-09-22 01:05:58",
+            "theme": "Midnight Dream"
         },
         "jaybinky": {
             "username": "jaybinky",
@@ -47,5 +48,11 @@
             "Warden GRC"
         ],
         "status": "active"
+    },
+    "friends": {},
+    "friend_requests": {
+        "jay": [
+            "Sarah"
+        ]
     }
 }
