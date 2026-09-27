@@ -5,6 +5,7 @@ import datetime
 import re
 import random
 import subprocess
+import urllib.request
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -41,59 +42,61 @@ PALETTES = {
 }
 
 def load_db():
-    if not os.path.exists(r"C:\Orbital"):
-        os.makedirs(r"C:\Orbital", exist_ok=True)
+    os.makedirs(r"C:\Orbital", exist_ok=True)
+    os.makedirs(r"C:\Orbital\core", exist_ok=True)
+    os.makedirs(r"C:\Orbital\gui", exist_ok=True)
+    os.makedirs(r"C:\Orbital\users", exist_ok=True)
+    os.makedirs(r"C:\Orbital\shared", exist_ok=True)
+    os.makedirs(r"C:\Orbital\web_files", exist_ok=True)
+
     if os.path.exists(DB_PATH):
         try:
             with open(DB_PATH, "r", encoding="utf-8") as f:
                 db = json.load(f)
-                if "users" not in db or not isinstance(db["users"], dict): db["users"] = {}
-                if "cooldowns" not in db or not isinstance(db["cooldowns"], dict): db["cooldowns"] = {}
+                for k in ["users", "cooldowns", "inbox", "friends", "friend_requests"]:
+                    if k not in db or not isinstance(db[k], dict): db[k] = {}
                 return db
         except Exception:
             pass
-    db = {"users": {}, "cooldowns": {}}
+    db = {"users": {}, "cooldowns": {}, "inbox": {}, "friends": {}, "friend_requests": {}}
     save_db(db)
     return db
 
 def save_db(db):
-    if "users" not in db or not isinstance(db["users"], dict): db["users"] = {}
-    if "cooldowns" not in db or not isinstance(db["cooldowns"], dict): db["cooldowns"] = {}
+    for k in ["users", "cooldowns", "inbox", "friends", "friend_requests"]:
+        if k not in db or not isinstance(db[k], dict): db[k] = {}
     with open(DB_PATH, "w", encoding="utf-8") as f:
         json.dump(db, f, indent=4)
 
-def validate_password_policy(passcode):
-    if len(passcode) < 8:
-        return False, "Password must be at least 8 characters long."
-    if not re.search(r"[A-Z]", passcode):
-        return False, "Password must contain at least 1 uppercase letter (A-Z)."
-    if not re.search(r"[a-z]", passcode):
-        return False, "Password must contain at least 1 lowercase letter (a-z)."
-    if not re.search(r"[0-9]", passcode):
-        return False, "Password must contain at least 1 number (0-9)."
-    if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]", passcode):
-        return False, "Password must contain at least 1 special character."
-    return True, "Valid"
-
 def check_username_available(username, db):
-    if username.lower() == ADMIN_USER.lower():
-        return False, f"Username '{username}' is reserved for System Administrator."
-    if username in db.get("users", {}):
-        return False, f"Username '{username}' is already taken."
-    if username in db.get("cooldowns", {}):
-        deact_date_str = db["cooldowns"][username]
+    u_clean = username.strip()
+    if not u_clean: return False, "Username cannot be empty."
+    if u_clean.lower() == ADMIN_USER.lower():
+        return False, "Username 'Gravity' is reserved for Administrator."
+    if u_clean in db.get("users", {}):
+        return False, f"Username '{u_clean}' is already registered."
+    
+    cooldowns = db.get("cooldowns", {})
+    if u_clean in cooldowns:
         try:
-            deact_date = datetime.datetime.fromisoformat(deact_date_str)
-            days_passed = (datetime.datetime.now() - deact_date).days
-            if days_passed < 7:
-                remaining = 7 - days_passed
-                return False, f"Username '{username}' was recently deactivated. Reserved for {remaining} more day(s)."
-            else:
-                del db["cooldowns"][username]
-                save_db(db)
+            del_time = datetime.datetime.fromisoformat(cooldowns[u_clean])
+            diff = (datetime.datetime.now() - del_time).days
+            if diff < 7:
+                rem = 7 - diff
+                return False, f"Username '{u_clean}' was recently deleted and is reserved for {rem} more day(s)."
         except Exception:
             pass
     return True, "Available"
+
+def validate_password_policy(password):
+    p = password.strip()
+    if len(p) < 8: return False, "Password must be at least 8 characters long."
+    if not re.search(r"[A-Z]", p): return False, "Password must contain at least one uppercase letter."
+    if not re.search(r"[a-z]", p): return False, "Password must contain at least one lowercase letter."
+    if not re.search(r"[0-9]", p): return False, "Password must contain at least one digit."
+    if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", p):
+        return False, "Password must contain at least one special character."
+    return True, "Valid"
 
 class WatermarkEntry(tk.Entry):
     def __init__(self, master, placeholder="", is_password=False, palette=None, *args, **kwargs):
@@ -129,11 +132,39 @@ class WatermarkEntry(tk.Entry):
             return ""
         return self.get().strip()
 
+class AnimatedStatusBar(tk.Frame):
+    def __init__(self, master, label_text="Core Status", palette=None, *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.palette = palette or PALETTES["Midnight Dream"]
+        self.config(bg=self.palette["card"])
+
+        self.lbl = tk.Label(self, text=label_text, font=("Consolas", 8, "bold"), fg=self.palette["muted"], bg=self.palette["card"])
+        self.lbl.pack(anchor="w")
+
+        self.canvas = tk.Canvas(self, bg=self.palette["entry_bg"], height=8, bd=0, highlightthickness=0)
+        self.canvas.pack(fill=tk.X, pady=(2, 0))
+
+        self.val = random.randint(40, 85)
+        self.dir = 1
+        self._animate()
+
+    def _animate(self):
+        self.val += self.dir * random.randint(1, 3)
+        if self.val > 98: self.dir = -1
+        if self.val < 35: self.dir = 1
+
+        self.canvas.delete("all")
+        w = self.canvas.winfo_width()
+        if w > 1:
+            fill_w = int(w * (self.val / 100.0))
+            self.canvas.create_rectangle(0, 0, fill_w, 8, fill=self.palette["accent"], outline="")
+        self.after(120, self._animate)
+
 class OrbitalAuthApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Orbital Identity Gateway")
-        self.root.geometry("680x600")
+        self.root.title("Orbital Identity Gateway v24")
+        self.root.geometry("680x620")
         self.root.resizable(False, False)
 
         self.db = load_db()
@@ -160,16 +191,16 @@ class OrbitalAuthApp:
         self.theme_btn.pack(side=tk.RIGHT)
 
         self.card = tk.Frame(self.canvas, bg=self.palette["card"], bd=1, relief="solid", highlightbackground=self.palette["border"], highlightthickness=1)
-        self.card.place(relx=0.5, rely=0.53, width=560, height=480, anchor="center")
+        self.card.place(relx=0.5, rely=0.53, width=560, height=500, anchor="center")
 
         self.form_frame = tk.Frame(self.card, bg=self.palette["card"])
-        self.form_frame.place(x=30, y=20, width=500, height=440)
+        self.form_frame.place(x=30, y=15, width=500, height=470)
 
         self.title_lbl = tk.Label(self.form_frame, text="Orbital OS Access", font=("Consolas", 16, "bold"), fg=self.palette["text"], bg=self.palette["card"])
-        self.title_lbl.pack(anchor="w", pady=(5, 12))
+        self.title_lbl.pack(anchor="w", pady=(5, 10))
 
         tab_frame = tk.Frame(self.form_frame, bg=self.palette["card"])
-        tab_frame.pack(anchor="w", pady=(0, 15))
+        tab_frame.pack(anchor="w", pady=(0, 10))
 
         self.login_tab_btn = tk.Button(tab_frame, text="Sign In", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=16, pady=5, command=lambda: self.switch_mode("login"))
         self.login_tab_btn.pack(side=tk.LEFT, padx=(0, 10))
@@ -179,18 +210,26 @@ class OrbitalAuthApp:
 
         tk.Label(self.form_frame, text="Username", font=("Consolas", 9, "bold"), fg=self.palette["muted"], bg=self.palette["card"]).pack(anchor="w")
         self.user_entry = WatermarkEntry(self.form_frame, placeholder="Enter Username", palette=self.palette, font=("Consolas", 11), bg=self.palette["entry_bg"], bd=0, highlightthickness=1, highlightbackground=self.palette["border"])
-        self.user_entry.pack(fill=tk.X, pady=(2, 10), ipady=6)
+        self.user_entry.pack(fill=tk.X, pady=(2, 8), ipady=5)
 
         self.contact_label = tk.Label(self.form_frame, text="Email or Phone", font=("Consolas", 9, "bold"), fg=self.palette["muted"], bg=self.palette["card"])
         self.contact_entry = WatermarkEntry(self.form_frame, placeholder="Enter Email or Phone Number", palette=self.palette, font=("Consolas", 11), bg=self.palette["entry_bg"], bd=0, highlightthickness=1, highlightbackground=self.palette["border"])
 
         tk.Label(self.form_frame, text="Password", font=("Consolas", 9, "bold"), fg=self.palette["muted"], bg=self.palette["card"]).pack(anchor="w")
         self.pass_entry = WatermarkEntry(self.form_frame, placeholder="Enter Password", is_password=True, palette=self.palette, font=("Consolas", 11), bg=self.palette["entry_bg"], bd=0, highlightthickness=1, highlightbackground=self.palette["border"])
-        self.pass_entry.pack(fill=tk.X, pady=(2, 12), ipady=6)
+        self.pass_entry.pack(fill=tk.X, pady=(2, 10), ipady=5)
 
         self.terms_var = tk.BooleanVar(value=True)
         self.terms_check = tk.Checkbutton(self.form_frame, text="Agree to Terms & Policy", variable=self.terms_var, font=("Consolas", 9), fg=self.palette["muted"], bg=self.palette["card"], selectcolor=self.palette["card"], activebackground=self.palette["card"])
-        self.terms_check.pack(anchor="w", pady=(0, 12))
+        self.terms_check.pack(anchor="w", pady=(0, 10))
+
+        self.meters_frame = tk.Frame(self.form_frame, bg=self.palette["card"])
+        self.meters_frame.pack(fill=tk.X, pady=(0, 10))
+
+        self.m1 = AnimatedStatusBar(self.meters_frame, label_text="Nucleus AI Engine", palette=self.palette)
+        self.m1.pack(fill=tk.X, pady=2)
+        self.m2 = AnimatedStatusBar(self.meters_frame, label_text="Omnipose Spatial CSI Radar", palette=self.palette)
+        self.m2.pack(fill=tk.X, pady=2)
 
         btn_frame = tk.Frame(self.form_frame, bg=self.palette["card"])
         btn_frame.pack(fill=tk.X, pady=(5, 0))
@@ -203,7 +242,7 @@ class OrbitalAuthApp:
         self.stars = []
         for _ in range(25):
             x = random.randint(10, 670)
-            y = random.randint(10, 590)
+            y = random.randint(10, 610)
             r = random.randint(1, 3)
             self.stars.append({"x": x, "y": y, "r": r, "dx": random.choice([-1, 1]) * 0.3, "dy": random.choice([-1, 1]) * 0.3})
 
@@ -233,7 +272,7 @@ class OrbitalAuthApp:
             s["x"] += s["dx"]
             s["y"] += s["dy"]
             if s["x"] < 0 or s["x"] > 680: s["dx"] *= -1
-            if s["y"] < 0 or s["y"] > 600: s["dy"] *= -1
+            if s["y"] < 0 or s["y"] > 620: s["dy"] *= -1
             self.canvas.create_oval(s["x"]-s["r"], s["y"]-s["r"], s["x"]+s["r"], s["y"]+s["r"], fill=self.palette["accent_glow"], outline="", tags="star")
         self.root.after(80, self._animate_bg)
 
@@ -251,7 +290,7 @@ class OrbitalAuthApp:
             self.login_tab_btn.config(bg=self.palette["entry_bg"], fg=self.palette["text"])
             self.signup_tab_btn.config(bg=self.palette["accent"], fg=self.palette["btn_text"])
             self.contact_label.pack(anchor="w")
-            self.contact_entry.pack(fill=tk.X, pady=(2, 10), ipady=6)
+            self.contact_entry.pack(fill=tk.X, pady=(2, 8), ipady=5)
             self.submit_btn.config(text="Sign Up ➔")
 
     def submit(self):
@@ -323,7 +362,8 @@ class OrbitalAuthApp:
             save_db(self.db)
 
             user_dir = os.path.join(r"C:\Orbital\users", username)
-            os.makedirs(user_dir, exist_ok=True)
+            os.makedirs(os.path.join(user_dir, "inbox"), exist_ok=True)
+            os.makedirs(os.path.join(user_dir, "transfers"), exist_ok=True)
 
             messagebox.showinfo("Account Created", f"Account '{username}' created successfully!\nLaunching Onboarding Wizard...")
             self.root.destroy()
@@ -332,15 +372,25 @@ class OrbitalAuthApp:
     def _launch_admin_cloud(self):
         app_dir = os.path.dirname(os.path.abspath(__file__))
         target = os.path.join(app_dir, "orbital_admin_cloud_gui.py")
-        subprocess.Popen([sys.executable, target])
+        if not os.path.exists(target):
+            target = os.path.join(r"C:\Orbital\gui", "orbital_admin_cloud_gui.py")
+        self._silent_spawn([sys.executable, target])
 
     def _launch_user_navigator(self, username, is_new=False):
         app_dir = os.path.dirname(os.path.abspath(__file__))
         target = os.path.join(app_dir, "orbital_navigator_gui.py")
+        if not os.path.exists(target):
+            target = os.path.join(r"C:\Orbital\gui", "orbital_navigator_gui.py")
         cmd = [sys.executable, target, username]
-        if is_new:
-            cmd.append("--onboard")
-        subprocess.Popen(cmd)
+        if is_new: cmd.append("--onboard")
+        self._silent_spawn(cmd)
+
+    def _silent_spawn(self, cmd):
+        creationflags = 0x08000000 if sys.platform == "win32" else 0
+        pyw = sys.executable.replace("python.exe", "pythonw.exe")
+        if os.path.exists(pyw):
+            cmd[0] = pyw
+        subprocess.Popen(cmd, creationflags=creationflags)
 
 if __name__ == "__main__":
     root = tk.Tk()

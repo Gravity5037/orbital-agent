@@ -3,8 +3,6 @@ import sys
 import json
 import datetime
 import math
-import threading
-import time
 import subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -12,8 +10,12 @@ from tkinter import ttk, messagebox
 DB_PATH = r"C:\Orbital\users_db.json"
 
 def load_db():
-    if not os.path.exists(r"C:\Orbital"):
-        os.makedirs(r"C:\Orbital", exist_ok=True)
+    os.makedirs(r"C:\Orbital", exist_ok=True)
+    os.makedirs(r"C:\Orbital\core", exist_ok=True)
+    os.makedirs(r"C:\Orbital\gui", exist_ok=True)
+    os.makedirs(r"C:\Orbital\users", exist_ok=True)
+    os.makedirs(r"C:\Orbital\shared", exist_ok=True)
+
     if os.path.exists(DB_PATH):
         try:
             with open(DB_PATH, "r", encoding="utf-8") as f:
@@ -33,34 +35,6 @@ def save_db(db):
     with open(DB_PATH, "w", encoding="utf-8") as f:
         json.dump(db, f, indent=4)
 
-def run_github_sync(repo_dir=r"C:\Orbital", auto_push=True):
-    if not os.path.exists(os.path.join(repo_dir, ".git")):
-        if os.path.exists(r"C:\Orbital_FlashDrive\.git"):
-            repo_dir = r"C:\Orbital_FlashDrive"
-        else:
-            return "error", "Git repo not initialized in C:\\Orbital."
-    try:
-        subprocess.run(["git", "fetch", "origin"], cwd=repo_dir, capture_output=True, text=True, timeout=12)
-        head_hash = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo_dir, capture_output=True, text=True).stdout.strip()
-        up_res = subprocess.run(["git", "rev-parse", "@{u}"], cwd=repo_dir, capture_output=True, text=True)
-        up_hash = up_res.stdout.strip() if up_res.returncode == 0 else ""
-        
-        status_res = subprocess.run(["git", "status", "--porcelain"], cwd=repo_dir, capture_output=True, text=True)
-        has_changes = bool(status_res.stdout.strip())
-        
-        if has_changes and auto_push:
-            subprocess.run(["git", "add", "-A"], cwd=repo_dir, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "Orbital auto-sync update"], cwd=repo_dir, capture_output=True)
-            push_res = subprocess.run(["git", "push", "origin", "main"], cwd=repo_dir, capture_output=True, text=True, timeout=20)
-            if push_res.returncode == 0:
-                return "pushed", "Local updates pushed to GitHub successfully!"
-        
-        if up_hash and head_hash != up_hash:
-            return "newer_available", "Newer version detected on GitHub!"
-        return "up_to_date", "Orbital is fully up-to-date with GitHub."
-    except Exception as e:
-        return "error", f"GitHub Sync: {e}"
-
 class AdminCloudApp:
     def __init__(self, root):
         self.root = root
@@ -72,19 +46,6 @@ class AdminCloudApp:
         self.selected_user = None
 
         self._build_ui()
-        self._start_background_sync()
-
-    def _start_background_sync(self):
-        def _auto_sync_loop():
-            while True:
-                time.sleep(300)
-                st, msg = run_github_sync(auto_push=True)
-                if st == "newer_available":
-                    self.root.after(0, lambda: self.sync_status_lbl.config(text="⚡ Newer GitHub Version Detected!", fg="#00f2fe"))
-                elif st in ["pushed", "up_to_date"]:
-                    self.root.after(0, lambda: self.sync_status_lbl.config(text="🟢 GitHub Sync: Active (Every 5m)", fg="#a78bfa"))
-
-        threading.Thread(target=_auto_sync_loop, daemon=True).start()
 
     def _build_ui(self):
         top_bar = tk.Frame(self.root, bg="#0a0e1a", pady=10, padx=15)
@@ -93,10 +54,7 @@ class AdminCloudApp:
         lbl = tk.Label(top_bar, text="⚡ ORBITAL ADMIN CLOUD MATRIX // GRAVITY CORE", font=("Consolas", 12, "bold"), fg="#8b5cf6", bg="#0a0e1a")
         lbl.pack(side=tk.LEFT)
 
-        self.sync_status_lbl = tk.Label(top_bar, text="🟢 GitHub Sync: Active (Every 5m)", font=("Consolas", 9, "bold"), fg="#a78bfa", bg="#0a0e1a")
-        self.sync_status_lbl.pack(side=tk.LEFT, padx=(15, 0))
-
-        sync_btn = tk.Button(top_bar, text="🔄 Sync GitHub", font=("Consolas", 9, "bold"), fg="#ffffff", bg="#00f2fe", bd=0, padx=10, pady=4, command=self._manual_sync)
+        sync_btn = tk.Button(top_bar, text="🔄 Sync GitHub", font=("Consolas", 9, "bold"), fg="#ffffff", bg="#38bdf8", bd=0, padx=12, pady=4, command=self._sync_github)
         sync_btn.pack(side=tk.RIGHT, padx=(10, 0))
 
         add_inst_btn = tk.Button(top_bar, text="➕ Add User Instance", font=("Consolas", 9, "bold"), fg="#ffffff", bg="#8b5cf6", bd=0, padx=12, pady=4, command=self._add_instance_dialog)
@@ -131,19 +89,15 @@ class AdminCloudApp:
 
         self._render_cloud()
 
-    def _manual_sync(self):
-        st_type, msg = run_github_sync(auto_push=True)
-        if st_type == "pushed":
-            messagebox.showinfo("GitHub Sync", f"✔ Success: {msg}")
-        elif st_type == "newer_available":
-            ans = messagebox.askyesno("Newer Version Detected", f"{msg}\n\nWould you like to pull the newest version from GitHub now?")
-            if ans:
-                subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=r"C:\Orbital", capture_output=True)
-                messagebox.showinfo("Updated", "Orbital successfully updated to latest GitHub version!")
-        elif st_type == "up_to_date":
-            messagebox.showinfo("GitHub Sync", f"✔ Up-to-date: {msg}")
-        else:
-            messagebox.showwarning("Sync Warning", msg)
+    def _sync_github(self):
+        try:
+            res = subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=r"C:\Orbital", capture_output=True, text=True)
+            if "Already up to date" in res.stdout:
+                messagebox.showinfo("GitHub Sync", "Orbital is fully up-to-date with GitHub!")
+            else:
+                messagebox.showinfo("GitHub Sync Success", f"Updated from GitHub:\n\n{res.stdout}")
+        except Exception as e:
+            messagebox.showerror("Sync Error", f"Git sync failed: {e}")
 
     def _render_cloud(self):
         self.canvas.delete("all")
@@ -197,7 +151,10 @@ class AdminCloudApp:
             if not u or not p: return
             self.db["users"][u] = {"username": u, "password": p, "status": "active", "created": datetime.datetime.now().isoformat()}
             save_db(self.db)
-            os.makedirs(os.path.join(r"C:\Orbital\users", u), exist_ok=True)
+            u_dir = os.path.join(r"C:\Orbital\users", u)
+            os.makedirs(os.path.join(u_dir, "inbox"), exist_ok=True)
+            os.makedirs(os.path.join(u_dir, "transfers"), exist_ok=True)
+
             messagebox.showinfo("Instance Provisioned", f"User instance '{u}' created!")
             dlg.destroy()
             self._render_cloud()
@@ -224,7 +181,12 @@ class AdminCloudApp:
         if not self.selected_user: return
         app_dir = os.path.dirname(os.path.abspath(__file__))
         target = os.path.join(app_dir, "orbital_navigator_gui.py")
-        subprocess.Popen([sys.executable, target, self.selected_user])
+        if not os.path.exists(target):
+            target = os.path.join(r"C:\Orbital\gui", "orbital_navigator_gui.py")
+        creationflags = 0x08000000 if sys.platform == "win32" else 0
+        pyw = sys.executable.replace("python.exe", "pythonw.exe")
+        cmd = [pyw if os.path.exists(pyw) else sys.executable, target, self.selected_user]
+        subprocess.Popen(cmd, creationflags=creationflags)
 
     def _delete_instance(self):
         if not self.selected_user: return

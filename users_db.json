@@ -54,5 +54,26 @@
         "jay": [
             "Sarah"
         ]
+    },
+    "inbox": {
+        "jaybinky": [
+            {
+                "sender": "jay",
+                "text": "hi",
+                "timestamp": "2026-09-22 05:14:50"
+            },
+            {
+                "sender": "jay",
+                "text": "whats up?",
+                "timestamp": "2026-09-22 05:15:02"
+            },
+            {
+                "sender": "jay",
+                "text": "\ud83d\udce6 File Shared: Capture.png\nLocal Path: C:\\Orbital\\users\\jaybinky\\transfers\\Capture.png\nHosted URL: http://localhost:8080/files/Capture.png",
+                "timestamp": "2026-09-22 05:15:25",
+                "file_path": "C:\\Orbital\\users\\jaybinky\\transfers\\Capture.png",
+                "url": "http://localhost:8080/files/Capture.png"
+            }
+        ]
     }
 }

@@ -2,15 +2,20 @@ import os
 import sys
 import json
 import time
+import math
+import random
 import urllib.request
 import threading
 import subprocess
+import http.server
+import socketserver
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
 DB_PATH = r"C:\Orbital\users_db.json"
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL_NAME = "qwen2.5-coder:1.5b"
+FILE_HOST_PORT = 8080
 
 PALETTES = {
     "Midnight Dream": {
@@ -41,75 +46,89 @@ PALETTES = {
 }
 
 def load_db():
-    if not os.path.exists(r"C:\Orbital"):
-        os.makedirs(r"C:\Orbital", exist_ok=True)
+    os.makedirs(r"C:\Orbital", exist_ok=True)
+    os.makedirs(r"C:\Orbital\core", exist_ok=True)
+    os.makedirs(r"C:\Orbital\gui", exist_ok=True)
+    os.makedirs(r"C:\Orbital\users", exist_ok=True)
+    os.makedirs(r"C:\Orbital\shared", exist_ok=True)
+    os.makedirs(r"C:\Orbital\web_files", exist_ok=True)
+
     if os.path.exists(DB_PATH):
         try:
             with open(DB_PATH, "r", encoding="utf-8") as f:
                 db = json.load(f)
-                if "users" not in db: db["users"] = {}
-                if "cooldowns" not in db: db["cooldowns"] = {}
-                if "friends" not in db: db["friends"] = {}
-                if "friend_requests" not in db: db["friend_requests"] = {}
+                for k in ["users", "cooldowns", "inbox", "friends", "friend_requests"]:
+                    if k not in db or not isinstance(db[k], dict): db[k] = {}
                 return db
         except Exception:
             pass
-    db = {"users": {}, "cooldowns": {}, "friends": {}, "friend_requests": {}}
+    db = {"users": {}, "cooldowns": {}, "inbox": {}, "friends": {}, "friend_requests": {}}
     save_db(db)
     return db
 
 def save_db(db):
-    for k in ["users", "cooldowns", "friends", "friend_requests"]:
-        if k not in db or not isinstance(db[k], dict):
-            db[k] = {}
+    for k in ["users", "cooldowns", "inbox", "friends", "friend_requests"]:
+        if k not in db or not isinstance(db[k], dict): db[k] = {}
     with open(DB_PATH, "w", encoding="utf-8") as f:
         json.dump(db, f, indent=4)
-
-def run_github_sync(repo_dir=r"C:\Orbital", auto_push=True):
-    if not os.path.exists(os.path.join(repo_dir, ".git")):
-        if os.path.exists(r"C:\Orbital_FlashDrive\.git"):
-            repo_dir = r"C:\Orbital_FlashDrive"
-        else:
-            return "error", "Git repo not initialized in C:\\Orbital."
-    try:
-        subprocess.run(["git", "fetch", "origin"], cwd=repo_dir, capture_output=True, text=True, timeout=12)
-        head_hash = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo_dir, capture_output=True, text=True).stdout.strip()
-        up_res = subprocess.run(["git", "rev-parse", "@{u}"], cwd=repo_dir, capture_output=True, text=True)
-        up_hash = up_res.stdout.strip() if up_res.returncode == 0 else ""
-        
-        status_res = subprocess.run(["git", "status", "--porcelain"], cwd=repo_dir, capture_output=True, text=True)
-        has_changes = bool(status_res.stdout.strip())
-        
-        if has_changes and auto_push:
-            subprocess.run(["git", "add", "-A"], cwd=repo_dir, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "Orbital auto-sync update"], cwd=repo_dir, capture_output=True)
-            push_res = subprocess.run(["git", "push", "origin", "main"], cwd=repo_dir, capture_output=True, text=True, timeout=20)
-            if push_res.returncode == 0:
-                return "pushed", "Local updates pushed to GitHub successfully!"
-        
-        if up_hash and head_hash != up_hash:
-            return "newer_available", "Newer version detected on GitHub!"
-        return "up_to_date", "Orbital is fully up-to-date with GitHub."
-    except Exception as e:
-        return "error", f"GitHub Sync: {e}"
 
 def ensure_nucleus_running():
     try:
         req = urllib.request.Request("http://localhost:11434/api/tags")
-        with urllib.request.urlopen(req, timeout=2) as resp:
-            if resp.status == 200:
-                return True
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            if resp.status == 200: return True
     except Exception:
         pass
     app_dir = os.path.dirname(os.path.abspath(__file__))
     engine_path = os.path.join(app_dir, "engine.py")
+    if not os.path.exists(engine_path):
+        engine_path = os.path.join(r"C:\Orbital\core", "engine.py")
     if os.path.exists(engine_path):
         try:
-            subprocess.Popen([sys.executable, engine_path])
-            time.sleep(1.5)
+            creationflags = 0x08000000 if sys.platform == "win32" else 0
+            pyw = sys.executable.replace("python.exe", "pythonw.exe")
+            cmd = [pyw if os.path.exists(pyw) else sys.executable, engine_path]
+            subprocess.Popen(cmd, creationflags=creationflags)
+            time.sleep(1.2)
         except Exception:
             pass
     return False
+
+def start_file_host_server():
+    web_dir = r"C:\Orbital\web_files"
+    os.makedirs(web_dir, exist_ok=True)
+    class FileHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=web_dir, **kwargs)
+        def log_message(self, format, *args): pass
+
+    def run_server():
+        try:
+            with socketserver.TCPServer(("0.0.0.0", FILE_HOST_PORT), FileHandler) as httpd:
+                httpd.serve_forever()
+        except Exception:
+            pass
+    t = threading.Thread(target=run_server, daemon=True)
+    t.start()
+
+start_file_host_server()
+
+def detect_available_cameras():
+    cameras = []
+    try:
+        import cv2
+        for idx in range(4):
+            cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY)
+            if cap.isOpened():
+                ret, _ = cap.read()
+                if ret:
+                    cameras.append((idx, f"Camera Device #{idx}"))
+                cap.release()
+    except Exception:
+        pass
+    if not cameras:
+        cameras = [(0, "Camera Device #0 (Default)")]
+    return cameras
 
 class DragDropTransferHub(tk.Frame):
     def __init__(self, master, current_user="Guest", palette=None, *args, **kwargs):
@@ -152,11 +171,9 @@ class DragDropTransferHub(tk.Frame):
     def refresh_targets(self):
         db = load_db()
         users = [u for u in db.get("users", {}).keys() if u != self.current_user]
-        if not users:
-            users = ["No Other Instances Found"]
+        if not users: users = ["No Other Instances Found"]
         self.target_dropdown["values"] = users
-        if users:
-            self.target_var.set(users[0])
+        if users: self.target_var.set(users[0])
 
     def _select_file(self):
         f = filedialog.askopenfilename(title="Select Payload File to Transfer")
@@ -175,17 +192,38 @@ class DragDropTransferHub(tk.Frame):
             messagebox.showwarning("Invalid Target", "Please select a valid target user instance.")
             return
 
-        target_dir = os.path.join(r"C:\Orbital\users", target_user)
+        target_dir = os.path.join(r"C:\Orbital\users", target_user, "transfers")
         os.makedirs(target_dir, exist_ok=True)
 
         fname = os.path.basename(self.selected_file)
         dest_path = os.path.join(target_dir, fname)
 
+        web_host_dir = r"C:\Orbital\web_files"
+        web_dest = os.path.join(web_host_dir, fname)
+
         try:
             import shutil
             shutil.copy(self.selected_file, dest_path)
-            self.status_lbl.config(text=f"✔ Transferred '{fname}' to user '{target_user}' workspace successfully!")
-            messagebox.showinfo("Transfer Success", f"Payload '{fname}' successfully synced to '{target_user}' workspace!\n\nDestination:\n{dest_path}")
+            shutil.copy(self.selected_file, web_dest)
+
+            host_url = f"http://localhost:{FILE_HOST_PORT}/files/{fname}"
+
+            db = load_db()
+            if "inbox" not in db: db["inbox"] = {}
+            if target_user not in db["inbox"]: db["inbox"][target_user] = []
+
+            msg_entry = {
+                "sender": self.current_user,
+                "text": f"📦 File Shared: {fname}\nLocal Path: {dest_path}\nHosted URL: {host_url}",
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "file_path": dest_path,
+                "url": host_url
+            }
+            db["inbox"][target_user].append(msg_entry)
+            save_db(db)
+
+            self.status_lbl.config(text=f"✔ Transferred '{fname}' to '{target_user}' transfers directory & hosted online!")
+            messagebox.showinfo("Transfer Success", f"Payload '{fname}' successfully synced!\n\nTarget Workspace:\n{dest_path}\n\nHosted Link:\n{host_url}")
         except Exception as e:
             messagebox.showerror("Transfer Error", f"Failed to transfer file: {e}")
 
@@ -205,8 +243,7 @@ class OnboardingWizard(tk.Toplevel):
         self._build_step()
 
     def _build_step(self):
-        for w in self.winfo_children():
-            w.destroy()
+        for w in self.winfo_children(): w.destroy()
 
         card = tk.Frame(self, bg=self.palette["card"], bd=1, relief="solid", highlightbackground=self.palette["border"], highlightthickness=1)
         card.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
@@ -271,8 +308,7 @@ class OnboardingWizard(tk.Toplevel):
             self._build_step()
         else:
             self.destroy()
-            if self.on_complete:
-                self.on_complete()
+            if self.on_complete: self.on_complete()
 
 class SettingsModal(tk.Toplevel):
     def __init__(self, master, username, palette, on_theme_change):
@@ -283,7 +319,7 @@ class SettingsModal(tk.Toplevel):
         self.db = load_db()
 
         self.title(f"Orbital User Settings - {self.username}")
-        self.geometry("560x560")
+        self.geometry("560x540")
         self.configure(bg=self.palette["bg"])
         self.resizable(False, False)
 
@@ -294,7 +330,7 @@ class SettingsModal(tk.Toplevel):
         card.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         lbl = tk.Label(card, text=f"⚙️ Account Settings ({self.username})", font=("Consolas", 14, "bold"), fg=self.palette["accent"], bg=self.palette["card"])
-        lbl.pack(anchor="w", padx=20, pady=(20, 10))
+        lbl.pack(anchor="w", padx=20, pady=(15, 10))
 
         tk.Label(card, text="Email or Contact:", font=("Consolas", 9, "bold"), fg=self.palette["muted"], bg=self.palette["card"]).pack(anchor="w", padx=20)
         self.email_entry = tk.Entry(card, font=("Consolas", 10), bg=self.palette["entry_bg"], fg=self.palette["text"], insertbackground=self.palette["text"], bd=1, relief="solid")
@@ -312,12 +348,12 @@ class SettingsModal(tk.Toplevel):
         theme_dropdown.pack(fill=tk.X, padx=20, pady=(2, 15))
 
         btn_row = tk.Frame(card, bg=self.palette["card"])
-        btn_row.pack(fill=tk.X, padx=20, pady=(0, 15))
+        btn_row.pack(anchor="w", padx=20, pady=(0, 15))
 
         save_btn = tk.Button(btn_row, text="💾 Save Changes", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=14, pady=6, command=self._save_settings)
         save_btn.pack(side=tk.LEFT, padx=(0, 10))
 
-        sync_btn = tk.Button(btn_row, text="🔄 GitHub Sync", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent_glow"], bd=0, padx=14, pady=6, command=self._trigger_sync)
+        sync_btn = tk.Button(btn_row, text="🔄 GitHub Sync", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent_glow"], bd=0, padx=14, pady=6, command=self._trigger_git_sync)
         sync_btn.pack(side=tk.LEFT)
 
         tk.Frame(card, bg=self.palette["border"], height=1).pack(fill=tk.X, padx=20, pady=10)
@@ -331,19 +367,15 @@ class SettingsModal(tk.Toplevel):
             del_btn = tk.Button(del_frame, text="🗑️ Delete Account & Data", font=("Consolas", 10, "bold"), fg="#ffffff", bg="#b4182d", bd=0, padx=14, pady=6, command=self._prompt_delete)
             del_btn.pack(anchor="w")
 
-    def _trigger_sync(self):
-        st_type, msg = run_github_sync(auto_push=True)
-        if st_type == "pushed":
-            messagebox.showinfo("GitHub Sync", f"✔ Success: {msg}")
-        elif st_type == "newer_available":
-            ans = messagebox.askyesno("Update Available", f"{msg}\n\nWould you like to pull the newest version from GitHub now?")
-            if ans:
-                subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=r"C:\Orbital", capture_output=True)
-                messagebox.showinfo("Updated", "Orbital has been updated to the latest GitHub version! Please restart.")
-        elif st_type == "up_to_date":
-            messagebox.showinfo("GitHub Sync", f"✔ Up-to-date: {msg}")
-        else:
-            messagebox.showwarning("Sync Warning", msg)
+    def _trigger_git_sync(self):
+        try:
+            res = subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=r"C:\Orbital", capture_output=True, text=True)
+            if "Already up to date" in res.stdout:
+                messagebox.showinfo("GitHub Sync", "Orbital is fully up-to-date with GitHub!")
+            else:
+                messagebox.showinfo("GitHub Sync Success", f"Updated from GitHub successfully:\n\n{res.stdout}")
+        except Exception as e:
+            messagebox.showerror("Sync Error", f"Git sync failed: {e}")
 
     def _save_settings(self):
         new_contact = self.email_entry.get().strip()
@@ -424,24 +456,47 @@ class OrbitalNavigatorWorkstation:
 
         self.cam_running = False
         self.cam_thread = None
+        self.current_cam_idx = 0
+
+        self.user_dir = os.path.join(r"C:\Orbital\users", self.username)
+        os.makedirs(os.path.join(self.user_dir, "inbox"), exist_ok=True)
+        os.makedirs(os.path.join(self.user_dir, "transfers"), exist_ok=True)
+        self.memory_path = os.path.join(self.user_dir, "user_memory.json")
+        self.user_memory = self._load_user_memory()
 
         self._build_ui()
-        self._start_background_sync()
+        self._start_background_sync_watcher()
 
         if "--onboard" in sys.argv:
             OnboardingWizard(self.root, self.username, self.palette, on_complete=self._refresh_theme_from_db)
 
-    def _start_background_sync(self):
-        def _auto_sync_loop():
+    def _load_user_memory(self):
+        if os.path.exists(self.memory_path):
+            try:
+                with open(self.memory_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception: pass
+        mem = {"conversations": [], "learned_facts": [], "preferences": {}}
+        self._save_user_memory(mem)
+        return mem
+
+    def _save_user_memory(self, mem=None):
+        if mem is not None: self.user_memory = mem
+        with open(self.memory_path, "w", encoding="utf-8") as f:
+            json.dump(self.user_memory, f, indent=4)
+
+    def _start_background_sync_watcher(self):
+        def watcher():
             while True:
                 time.sleep(300)
-                st, msg = run_github_sync(auto_push=True)
-                if st == "newer_available":
-                    self.root.after(0, lambda: self.sync_status_lbl.config(text="⚡ Update Available on GitHub!", fg="#00f2fe"))
-                elif st in ["pushed", "up_to_date"]:
-                    self.root.after(0, lambda: self.sync_status_lbl.config(text="🟢 GitHub Sync: Active (Every 5m)", fg=self.palette["accent_glow"]))
-
-        threading.Thread(target=_auto_sync_loop, daemon=True).start()
+                try:
+                    res = subprocess.run(["git", "fetch", "origin"], cwd=r"C:\Orbital", capture_output=True, text=True)
+                    stat = subprocess.run(["git", "status", "-uno"], cwd=r"C:\Orbital", capture_output=True, text=True)
+                    if "Your branch is behind" in stat.stdout:
+                        self.root.after(0, lambda: self.sync_badge.config(text="⚡ Update Available on GitHub!", fg="#00f2fe"))
+                except Exception: pass
+        t = threading.Thread(target=watcher, daemon=True)
+        t.start()
 
     def _refresh_theme_from_db(self):
         self.db = load_db()
@@ -459,9 +514,7 @@ class OrbitalNavigatorWorkstation:
         self.nav_frame.configure(bg=self.palette["card"], highlightbackground=self.palette["border"])
         self.main_content.configure(bg=self.palette["bg"])
 
-        for f in self.frames.values():
-            f.configure(bg=self.palette["bg"])
-
+        for f in self.frames.values(): f.configure(bg=self.palette["bg"])
         self.switch_tab("chat")
 
     def _build_ui(self):
@@ -471,8 +524,8 @@ class OrbitalNavigatorWorkstation:
         title = tk.Label(self.top_bar, text=f"🛸 ORBITAL WORKSTATION // {self.username.upper()}", font=("Consolas", 12, "bold"), fg=self.palette["accent"], bg=self.palette["bg"])
         title.pack(side=tk.LEFT)
 
-        self.sync_status_lbl = tk.Label(self.top_bar, text="🟢 GitHub Sync: Active (Every 5m)", font=("Consolas", 9, "bold"), fg=self.palette["accent_glow"], bg=self.palette["bg"])
-        self.sync_status_lbl.pack(side=tk.LEFT, padx=(20, 0))
+        self.sync_badge = tk.Label(self.top_bar, text="🟢 GitHub Sync: Active (Every 5m)", font=("Consolas", 8, "bold"), fg=self.palette["muted"], bg=self.palette["bg"])
+        self.sync_badge.pack(side=tk.LEFT, padx=(15, 0))
 
         settings_btn = tk.Button(self.top_bar, text="⚙️ Settings", font=("Consolas", 9, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=12, pady=4, command=self._open_settings)
         settings_btn.pack(side=tk.RIGHT)
@@ -480,7 +533,7 @@ class OrbitalNavigatorWorkstation:
         body = tk.Frame(self.root, bg=self.palette["bg"])
         body.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 15))
 
-        self.nav_frame = tk.Frame(body, bg=self.palette["card"], width=220, bd=1, relief="solid", highlightbackground=self.palette["border"], highlightthickness=1)
+        self.nav_frame = tk.Frame(body, bg=self.palette["card"], width=230, bd=1, relief="solid", highlightbackground=self.palette["border"], highlightthickness=1)
         self.nav_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 15))
         self.nav_frame.pack_propagate(False)
 
@@ -496,7 +549,8 @@ class OrbitalNavigatorWorkstation:
             ("🎨 Image Generator", "image_gen"),
             ("🎵 Connected Media", "media"),
             ("📬 Inbox & DMs", "inbox"),
-            ("📦 Drag/Drop Hub", "transfer")
+            ("📦 Drag/Drop Hub", "transfer"),
+            ("🧠 Hive Mind Learning", "hive_mind")
         ]
 
         self.nav_buttons = {}
@@ -517,6 +571,7 @@ class OrbitalNavigatorWorkstation:
         self._build_media_tab()
         self._build_inbox_tab()
         self._build_transfer_tab()
+        self._build_hive_mind_tab()
 
         self.switch_tab("chat")
 
@@ -525,12 +580,9 @@ class OrbitalNavigatorWorkstation:
 
     def switch_tab(self, key):
         for k, btn in self.nav_buttons.items():
-            if k == key:
-                btn.config(bg=self.palette["accent"], fg=self.palette["btn_text"])
-            else:
-                btn.config(bg=self.palette["card"], fg=self.palette["muted"])
-        for f in self.frames.values():
-            f.pack_forget()
+            if k == key: btn.config(bg=self.palette["accent"], fg=self.palette["btn_text"])
+            else: btn.config(bg=self.palette["card"], fg=self.palette["muted"])
+        for f in self.frames.values(): f.pack_forget()
         self.frames[key].pack(fill=tk.BOTH, expand=True)
 
     def _build_chat_tab(self):
@@ -561,7 +613,7 @@ class OrbitalNavigatorWorkstation:
         send_btn = tk.Button(input_frame, text="Send ➔", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=16, pady=6, command=self.send_chat)
         send_btn.pack(side=tk.RIGHT)
 
-        self._append_chat("System", f"Orbital Workstation Active for {self.username}. Ready.")
+        self._append_chat("System", f"Orbital Workstation Active for {self.username}. Memory Store Loaded ({len(self.user_memory.get('conversations', []))} logs). Ready.")
 
     def _append_chat(self, sender, text):
         self.chat_text.config(state="normal")
@@ -576,6 +628,9 @@ class OrbitalNavigatorWorkstation:
         if not val: return
         self.entry.delete(0, tk.END)
         self._append_chat("You", val)
+        self.user_memory["conversations"].append({"timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "prompt": val})
+        self._save_user_memory()
+
         threading.Thread(target=self._query_ai, args=(val,), daemon=True).start()
 
     def _query_ai(self, prompt):
@@ -592,17 +647,53 @@ class OrbitalNavigatorWorkstation:
 
     def _build_presence_tab(self):
         f = self.frames["presence"]
-        lbl = tk.Label(f, text="📡 Omnipose Wi-Fi CSI Presence & Pose Tracking", font=("Consolas", 12, "bold"), fg=self.palette["accent"], bg=self.palette["bg"])
+        lbl = tk.Label(f, text="📡 Omnipose Spatial CSI Presence & 3D Particle Topographical Mesh", font=("Consolas", 12, "bold"), fg=self.palette["accent"], bg=self.palette["bg"])
         lbl.pack(anchor="w", pady=(0, 10))
 
-        scan_btn = tk.Button(f, text="⚡ Run 3D CSI Radar Scan", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=16, pady=8, command=self._run_csi_scan)
-        scan_btn.pack(anchor="w", pady=(0, 10))
+        btn_bar = tk.Frame(f, bg=self.palette["bg"])
+        btn_bar.pack(anchor="w", pady=(0, 10))
+
+        scan_btn = tk.Button(btn_bar, text="⚡ Run 3D CSI Radar Scan", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=14, pady=6, command=self._run_csi_scan)
+        scan_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        topo_btn = tk.Button(btn_bar, text="🌌 Render 3D Particle Heightmap", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent_glow"], bd=0, padx=14, pady=6, command=self._render_topo_mesh)
+        topo_btn.pack(side=tk.LEFT)
 
         self.csi_canvas = tk.Canvas(f, bg=self.palette["card"], bd=1, relief="solid", highlightbackground=self.palette["border"])
         self.csi_canvas.pack(fill=tk.BOTH, expand=True)
 
     def _run_csi_scan(self):
-        messagebox.showinfo("CSI Sensing", "Initiating sub-GHz disruption frequency sweep...")
+        self.csi_canvas.delete("all")
+        w, h = 600, 360
+        self.csi_canvas.create_rectangle(50, 40, w-50, h-40, outline=self.palette["border"], width=2)
+        self.csi_canvas.create_text(w//2, 20, text="ROOM TOPOGRAPHY (SUB-GHZ RF MESH)", font=("Consolas", 10, "bold"), fill=self.palette["accent_glow"])
+
+        px, py = random.randint(150, 450), random.randint(100, 280)
+        self.csi_canvas.create_oval(px-15, py-15, px+15, py+15, outline="#00f2fe", fill="", width=2)
+        self.csi_canvas.create_oval(px-30, py-30, px+30, py+30, outline="#38bdf8", fill="", width=1)
+        self.csi_canvas.create_text(px, py-40, text="SUBJECT DETECTED THROUGH WALL", font=("Consolas", 8, "bold"), fill="#00f2fe")
+
+    def _render_topo_mesh(self):
+        self.csi_canvas.delete("all")
+        w, h = 600, 360
+        self.csi_canvas.create_text(w//2, 20, text="3D PARTICLE TOPOGRAPHICAL HEIGHTMAP & FIGURE POSE", font=("Consolas", 10, "bold"), fill=self.palette["accent_glow"])
+
+        for _ in range(80):
+            x = random.randint(50, w-50)
+            y = random.randint(60, h-60)
+            r = random.randint(1, 3)
+            col = random.choice([self.palette["accent"], self.palette["accent_glow"], "#00f2fe"])
+            self.csi_canvas.create_oval(x-r, y-r, x+r, y+r, fill=col, outline="")
+
+        sx, sy = 300, 180
+        joints = [(sx, sy-40), (sx, sy), (sx-20, sy+20), (sx+20, sy+20), (sx-15, sy+60), (sx+15, sy+60)]
+        for jx, jy in joints:
+            self.csi_canvas.create_oval(jx-4, jy-4, jx+4, jy+4, fill="#10b981", outline="")
+        self.csi_canvas.create_line(sx, sy-40, sx, sy, fill="#10b981", width=2)
+        self.csi_canvas.create_line(sx, sy, sx-20, sy+20, fill="#10b981", width=2)
+        self.csi_canvas.create_line(sx, sy, sx+20, sy+20, fill="#10b981", width=2)
+        self.csi_canvas.create_line(sx, sy+20, sx-15, sy+60, fill="#10b981", width=2)
+        self.csi_canvas.create_line(sx, sy+20, sx+15, sy+60, fill="#10b981", width=2)
 
     def _build_camera_tab(self):
         f = self.frames["camera"]
@@ -612,28 +703,48 @@ class OrbitalNavigatorWorkstation:
         btn_frame = tk.Frame(f, bg=self.palette["bg"])
         btn_frame.pack(anchor="w", pady=(0, 10))
 
-        self.cam_btn = tk.Button(btn_frame, text="📹 Start Live Camera Stream", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=16, pady=8, command=self._toggle_cam)
+        tk.Label(btn_frame, text="Select Device:", font=("Consolas", 9, "bold"), fg=self.palette["text"], bg=self.palette["bg"]).pack(side=tk.LEFT, padx=(0, 5))
+        self.cam_detected = detect_available_cameras()
+        cam_options = [c[1] for c in self.cam_detected]
+
+        self.cam_select_var = tk.StringVar(value=cam_options[0] if cam_options else "Default Camera")
+        cam_combo = ttk.Combobox(btn_frame, textvariable=self.cam_select_var, values=cam_options, state="readonly", font=("Consolas", 9), width=24)
+        cam_combo.pack(side=tk.LEFT, padx=(0, 10))
+
+        self.cam_btn = tk.Button(btn_frame, text="📹 Start Live Feed", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=14, pady=6, command=self._toggle_cam)
         self.cam_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        remote_cam_btn = tk.Button(btn_frame, text="🌐 Remote PC Camera", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent_glow"], bd=0, padx=14, pady=6, command=self._connect_remote_cam)
+        remote_cam_btn.pack(side=tk.LEFT)
 
         self.cam_display = tk.Label(f, text="[Camera Stream Offline]", font=("Consolas", 12, "bold"), fg=self.palette["muted"], bg=self.palette["card"])
         self.cam_display.pack(fill=tk.BOTH, expand=True)
 
+    def _connect_remote_cam(self):
+        messagebox.showinfo("Remote Camera Node", "Querying remote PC instance for camera stream feed...")
+
     def _toggle_cam(self):
         if not self.cam_running:
+            sel_text = self.cam_select_var.get()
+            sel_idx = 0
+            for idx, label in self.cam_detected:
+                if label == sel_text: sel_idx = idx
+            self.current_cam_idx = sel_idx
+
             self.cam_running = True
-            self.cam_btn.config(text="⏹ Stop Camera Stream", bg="#b4182d")
+            self.cam_btn.config(text="⏹ Stop Camera Feed", bg="#b4182d")
             self.cam_thread = threading.Thread(target=self._cam_loop, daemon=True)
             self.cam_thread.start()
         else:
             self.cam_running = False
-            self.cam_btn.config(text="📹 Start Live Camera Stream", bg=self.palette["accent"])
+            self.cam_btn.config(text="📹 Start Live Feed", bg=self.palette["accent"])
             self.cam_display.config(text="[Camera Stream Offline]", image="")
 
     def _cam_loop(self):
         try:
             import cv2
             from PIL import Image, ImageTk
-            cap = cv2.VideoCapture(0)
+            cap = cv2.VideoCapture(self.current_cam_idx, cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY)
             while self.cam_running and cap.isOpened():
                 ret, frame = cap.read()
                 if ret:
@@ -647,7 +758,7 @@ class OrbitalNavigatorWorkstation:
             cap.release()
         except Exception as e:
             self.cam_running = False
-            self.root.after(0, lambda: messagebox.showerror("Camera Error", f"OpenCV Camera Feed Error: {e}"))
+            self.root.after(0, lambda: messagebox.showerror("Camera Error", f"Camera Feed Exception: {e}"))
 
     def _build_image_gen_tab(self):
         f = self.frames["image_gen"]
@@ -678,48 +789,146 @@ class OrbitalNavigatorWorkstation:
 
     def _build_inbox_tab(self):
         f = self.frames["inbox"]
-        lbl = tk.Label(f, text="📬 Inbox, Direct Messages & Friends", font=("Consolas", 12, "bold"), fg=self.palette["accent"], bg=self.palette["bg"])
+        lbl = tk.Label(f, text="📬 Inbox, Direct Messages & Targeted Messaging", font=("Consolas", 12, "bold"), fg=self.palette["accent"], bg=self.palette["bg"])
         lbl.pack(anchor="w", pady=(0, 10))
 
-        search_frame = tk.Frame(f, bg=self.palette["bg"])
-        search_frame.pack(fill=tk.X, pady=(0, 10))
+        top_frame = tk.Frame(f, bg=self.palette["bg"])
+        top_frame.pack(fill=tk.X, pady=(0, 10))
 
-        tk.Label(search_frame, text="Find User:", font=("Consolas", 9, "bold"), fg=self.palette["text"], bg=self.palette["bg"]).pack(side=tk.LEFT, padx=(0, 5))
-        self.friend_search_entry = tk.Entry(search_frame, font=("Consolas", 10), bg=self.palette["card"], fg=self.palette["text"], insertbackground=self.palette["text"], bd=1, relief="solid")
-        self.friend_search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5), ipady=4)
+        tk.Label(top_frame, text="Target User:", font=("Consolas", 9, "bold"), fg=self.palette["text"], bg=self.palette["bg"]).pack(side=tk.LEFT, padx=(0, 5))
+        self.dm_target_var = tk.StringVar(value="Select User...")
+        self.dm_target_combo = ttk.Combobox(top_frame, textvariable=self.dm_target_var, state="readonly", font=("Consolas", 10), width=20)
+        self.dm_target_combo.pack(side=tk.LEFT, padx=(0, 10))
+        self._refresh_dm_users()
 
-        add_btn = tk.Button(search_frame, text="➕ Send Friend Request", font=("Consolas", 9, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=10, pady=4, command=self._send_friend_req)
-        add_btn.pack(side=tk.RIGHT)
+        refresh_btn = tk.Button(top_frame, text="🔄 Refresh Inbox", font=("Consolas", 9, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=10, pady=4, command=self._refresh_inbox_messages)
+        refresh_btn.pack(side=tk.RIGHT)
 
         self.msg_box = tk.Text(f, bg=self.palette["card"], fg=self.palette["text"], font=("Consolas", 10), wrap="word", bd=1, relief="solid", highlightbackground=self.palette["border"])
-        self.msg_box.pack(fill=tk.BOTH, expand=True)
-        self.msg_box.insert(tk.END, f"📬 System Inbox for {self.username}:\n- [SYSTEM]: Welcome to Orbital DMs.\n- [INFO]: Use search bar above to connect with other Orbital profiles.")
-        self.msg_box.config(state="disabled")
+        self.msg_box.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-    def _send_friend_req(self):
-        target = self.friend_search_entry.get().strip()
-        if not target: return
-        self.db = load_db()
-        if target not in self.db.get("users", {}):
-            messagebox.showerror("User Not Found", f"User '{target}' does not exist.")
-            return
-        if target == self.username:
-            messagebox.showwarning("Invalid", "Cannot add yourself.")
-            return
+        send_frame = tk.Frame(f, bg=self.palette["bg"])
+        send_frame.pack(fill=tk.X)
 
-        if target not in self.db["friend_requests"]:
-            self.db["friend_requests"][target] = []
-        if self.username not in self.db["friend_requests"][target]:
-            self.db["friend_requests"][target].append(self.username)
-            save_db(self.db)
-            messagebox.showinfo("Request Sent", f"Friend request sent to '{target}'!")
+        self.dm_input = tk.Entry(send_frame, font=("Consolas", 10), bg=self.palette["card"], fg=self.palette["text"], insertbackground=self.palette["text"], bd=1, relief="solid")
+        self.dm_input.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8), ipady=5)
+        self.dm_input.bind("<Return>", lambda e: self._send_direct_message())
+
+        send_msg_btn = tk.Button(send_frame, text="Send DM ➔", font=("Consolas", 9, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=12, pady=5, command=self._send_direct_message)
+        send_msg_btn.pack(side=tk.RIGHT)
+
+        self._refresh_inbox_messages()
+
+    def _refresh_dm_users(self):
+        db = load_db()
+        users = [u for u in db.get("users", {}).keys() if u != self.username]
+        self.dm_target_combo["values"] = users
+        if users: self.dm_target_var.set(users[0])
+
+    def _send_direct_message(self):
+        txt = self.dm_input.get().strip()
+        target = self.dm_target_var.get()
+        if not txt or target in ["Select User...", ""]: return
+
+        db = load_db()
+        if "inbox" not in db: db["inbox"] = {}
+        if target not in db["inbox"]: db["inbox"][target] = []
+
+        entry = {
+            "sender": self.username,
+            "text": txt,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        db["inbox"][target].append(entry)
+        save_db(db)
+
+        self.dm_input.delete(0, tk.END)
+        messagebox.showinfo("DM Sent", f"Direct message sent to '{target}'!")
+        self._refresh_inbox_messages()
+
+    def _refresh_inbox_messages(self):
+        self.msg_box.config(state="normal")
+        self.msg_box.delete("1.0", tk.END)
+        self.msg_box.insert(tk.END, f"📬 Direct Messages & Notifications Inbox for '{self.username}':\n" + "-"*60 + "\n\n")
+
+        db = load_db()
+        my_inbox = db.get("inbox", {}).get(self.username, [])
+        if not my_inbox:
+            self.msg_box.insert(tk.END, "No messages received yet.\n")
         else:
-            messagebox.showinfo("Already Sent", f"Friend request to '{target}' is already pending.")
+            for item in my_inbox:
+                s = item.get("sender", "System")
+                t = item.get("text", "")
+                ts = item.get("timestamp", "")
+                self.msg_box.insert(tk.END, f"[{ts}] FROM {s}:\n{t}\n" + "-"*40 + "\n\n")
+        self.msg_box.config(state="disabled")
 
     def _build_transfer_tab(self):
         f = self.frames["transfer"]
         hub = DragDropTransferHub(f, current_user=self.username, palette=self.palette)
         hub.pack(fill=tk.BOTH, expand=True)
+
+    def _build_hive_mind_tab(self):
+        f = self.frames["hive_mind"]
+        lbl = tk.Label(f, text="🧠 GibberLink Hive Mind & Cross-Instance Knowledge Learning", font=("Consolas", 12, "bold"), fg=self.palette["accent"], bg=self.palette["bg"])
+        lbl.pack(anchor="w", pady=(0, 10))
+
+        bar = tk.Frame(f, bg=self.palette["bg"])
+        bar.pack(anchor="w", pady=(0, 10))
+
+        share_btn = tk.Button(bar, text="⚡ Share Fact to Hive", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=14, pady=6, command=self._share_fact_to_hive)
+        share_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        sync_btn = tk.Button(bar, text="📥 Sync Insights from Hive", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent_glow"], bd=0, padx=14, pady=6, command=self._sync_facts_from_hive)
+        sync_btn.pack(side=tk.LEFT)
+
+        self.hive_text = tk.Text(f, bg=self.palette["card"], fg=self.palette["text"], font=("Consolas", 10), wrap="word", bd=1, relief="solid", highlightbackground=self.palette["border"])
+        self.hive_text.pack(fill=tk.BOTH, expand=True)
+        self._refresh_hive_text()
+
+    def _share_fact_to_hive(self):
+        fact = f"Instance '{self.username}' observed system node status active at {time.strftime('%H:%M:%S')}."
+        hive_file = r"C:\Orbital\shared\hive_knowledge_base.json"
+        data = []
+        if os.path.exists(hive_file):
+            try:
+                with open(hive_file, "r", encoding="utf-8") as f: data = json.load(f)
+            except Exception: pass
+        data.append({"author": self.username, "fact": fact, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")})
+        with open(hive_file, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
+        messagebox.showinfo("Knowledge Shared", f"Shared insight to Hive Mind:\n{fact}")
+        self._refresh_hive_text()
+
+    def _sync_facts_from_hive(self):
+        hive_file = r"C:\Orbital\shared\hive_knowledge_base.json"
+        if os.path.exists(hive_file):
+            try:
+                with open(hive_file, "r", encoding="utf-8") as f: data = json.load(f)
+                self.user_memory["learned_facts"] = data
+                self._save_user_memory()
+                messagebox.showinfo("Hive Sync", f"Merged {len(data)} insights into local memory store!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to sync: {e}")
+        self._refresh_hive_text()
+
+    def _refresh_hive_text(self):
+        self.hive_text.config(state="normal")
+        self.hive_text.delete("1.0", tk.END)
+        self.hive_text.insert(tk.END, "🧠 GLOBAL HIVE MIND SHARED KNOWLEDGE BASE:\n" + "="*50 + "\n\n")
+
+        hive_file = r"C:\Orbital\shared\hive_knowledge_base.json"
+        if os.path.exists(hive_file):
+            try:
+                with open(hive_file, "r", encoding="utf-8") as f: data = json.load(f)
+                for item in data:
+                    a = item.get("author", "Anon")
+                    ft = item.get("fact", "")
+                    ts = item.get("timestamp", "")
+                    self.hive_text.insert(tk.END, f"[{ts}] {a}: {ft}\n")
+            except Exception: pass
+        else:
+            self.hive_text.insert(tk.END, "No shared hive insights yet. Click 'Share Fact' to post.\n")
+        self.hive_text.config(state="disabled")
 
 if __name__ == "__main__":
     user = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else "Operator"

@@ -1,0 +1,10 @@
+{
+    "conversations": [
+        {
+            "timestamp": "2026-09-27 12:42:28",
+            "prompt": "hi"
+        }
+    ],
+    "learned_facts": [],
+    "preferences": {}
+}
