@@ -1,33 +1,13 @@
 import os
 import sys
 import json
-import uuid
-import shutil
-import tempfile
-
-def deploy_v30_ghost_and_zero_bloat_architecture():
-    print("=============================================================")
-    print("  ORBITAL OS v30: ON-DEMAND STREAMING & GHOST ADMIN MATRIX   ")
-    print("=============================================================")
-
-    base_dir = r"C:\\Orbital"
-    os.makedirs(base_dir, exist_ok=True)
-    os.chdir(base_dir)
-
-    for d in ["core", "gui", "users", "shared", "packets", "Nucleus"]:
-        os.makedirs(os.path.join(base_dir, d), exist_ok=True)
-
-    # 1. Zero-Bloat Remote Streaming & Ghost Controller
-    ghost_controller_code = """import os
-import sys
-import json
 import tempfile
 import shutil
 
 class GhostAdminStreamEngine:
     def __init__(self, admin_id="Gravity"):
         self.admin_id = admin_id
-        self.base_dir = r"C:\\Orbital"
+        self.base_dir = r"C:\Orbital"
         self.packets_dir = os.path.join(self.base_dir, "packets")
         os.makedirs(self.packets_dir, exist_ok=True)
 
@@ -88,40 +68,3 @@ if __name__ == "__main__":
     ghost.stream_remote_user_manifest("User_Alpha", "NODE-9981")
     ghost.ghost_execute_remote_process("User_Alpha", "python test_suite.py")
     ghost.export_user_packet("User_Alpha", ["logs/session.log"])
-"""
-
-    with open(os.path.join(base_dir, "core", "ghost_stream_engine.py"), "w", encoding="utf-8") as f:
-        f.write(ghost_controller_code)
-    print("  [✔] Ghost Stream & Zero-Bloat Engine deployed to C:\\Orbital\\core\\ghost_stream_engine.py")
-
-    # 2. Update Governance Schema
-    gov_schema = {
-        "architecture_version": "v30_ghost_zero_bloat",
-        "storage_policy": {
-            "admin_device": "zero_local_user_backups",
-            "cloud_relay": "zero_permanent_user_storage",
-            "user_devices": "self_hosted_on_allocated_nodes",
-            "transfers": "on_demand_p2p_ram_stream_or_explicit_orbpacket"
-        },
-        "admin_privileges": {
-            "mode": "unrestricted_ghost_override",
-            "capabilities": [
-                "remote_ram_manifest_stream",
-                "lock_free_process_execution",
-                "undetectable_simulation",
-                "explicit_packet_export"
-            ]
-        }
-    }
-    with open(os.path.join(base_dir, "users", "governance_v30_config.json"), "w", encoding="utf-8") as f:
-        json.dump(gov_schema, f, indent=4)
-
-    print("=============================================================")
-    print("   [✔] v30 GHOST & ZERO-BLOAT DEPLOYMENT COMPLETE!           ")
-    print("   - No user backups stored on Admin PC or cloud relay.     ")
-    print("   - All remote queries stream strictly into temporary RAM.  ")
-    print("   - Process execution operates silently with zero locks.   ")
-    print("=============================================================")
-
-if __name__ == "__main__":
-    deploy_v30_ghost_and_zero_bloat_architecture()
