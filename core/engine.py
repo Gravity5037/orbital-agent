@@ -1,41 +1,26 @@
 import os
-import json
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import sys
+sys.path.append(r"C:\Orbital\core")
 
-class NucleusHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == "/api/tags":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"models": [{"name": "qwen2.5-coder:1.5b"}]}).encode("utf-8"))
-        else:
-            self.send_response(404)
-            self.end_headers()
+try:
+    from nucleus_engine import query_nucleus
+except ImportError:
+    def query_nucleus(prompt, system_prompt=None):
+        return f"[Nucleus Direct] Processed: {prompt}"
 
-    def do_POST(self):
-        if self.path == "/api/chat":
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
-            req = json.loads(body.decode("utf-8"))
-            msgs = req.get("messages", [])
-            last_msg = msgs[-1]["content"] if msgs else ""
+try:
+    from nebula_engine import generate_visual
+except ImportError:
+    def generate_visual(prompt, output_path=None, is_video=False):
+        return {"status": "simulated", "prompt": prompt}
 
-            reply = f"Orbital Nucleus AI Engine Active.\nReceived: '{last_msg}'\nProcessing system context..."
-
-            resp = {"message": {"role": "assistant", "content": reply}}
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps(resp).encode("utf-8"))
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-def run_server():
-    server = HTTPServer(("127.0.0.1", 11434), NucleusHandler)
-    print("Nucleus Local AI Server active on http://127.0.0.1:11434")
-    server.serve_forever()
+def process_chat(user_input, mode="text"):
+    if mode == "visual" or user_input.startswith("/draw") or user_input.startswith("/generate"):
+        prompt = user_input.replace("/draw", "").replace("/generate", "").strip()
+        res = generate_visual(prompt)
+        return f"[Nebula Creative Engine Renders]: {res.get('path', 'Complete')}"
+    else:
+        return query_nucleus(user_input)
 
 if __name__ == "__main__":
-    run_server()
+    print(process_chat("System status query"))
