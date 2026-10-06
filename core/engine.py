@@ -18,7 +18,8 @@ def process_chat(user_input, mode="text"):
     if mode == "visual" or user_input.startswith("/draw") or user_input.startswith("/generate"):
         prompt = user_input.replace("/draw", "").replace("/generate", "").strip()
         res = generate_visual(prompt)
-        return f"[Nebula Creative Engine Renders]: {res.get('path', 'Complete')}"
+        res_path = res.get('path', res) if isinstance(res, dict) else str(res)
+        return f"[Nebula Creative Engine Renders]: {res_path}"
     else:
         return query_nucleus(user_input)
 

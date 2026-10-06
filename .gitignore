@@ -4,3 +4,5 @@ build/
 *.log
 *.specNucleus/*.gguf 
 *.gguf 
+*.exe
+outputs/

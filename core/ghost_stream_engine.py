@@ -63,6 +63,23 @@ class GhostAdminStreamEngine:
         print(f"[📦 PACKET EXPORT] Created standalone file packet at: {packet_path}")
         return packet_path
 
+    def get_system_status(self):
+        local_bloat = 0
+        backups_dir = os.path.join(self.base_dir, "backups")
+        if os.path.exists(backups_dir):
+            for root, dirs, files in os.walk(backups_dir):
+                for f in files:
+                    local_bloat += os.path.getsize(os.path.join(root, f))
+        return {
+            "ghost_mode": "ACTIVE (Zero-Bloat P2P RAM Stream)",
+            "user_backups_local_bytes": local_bloat,
+            "storage_policy": "zero_local_user_backups",
+            "active_nodes": 1,
+            "admin_override": True
+        }
+
+GhostStreamEngine = GhostAdminStreamEngine
+
 if __name__ == "__main__":
     ghost = GhostAdminStreamEngine()
     ghost.stream_remote_user_manifest("User_Alpha", "NODE-9981")
