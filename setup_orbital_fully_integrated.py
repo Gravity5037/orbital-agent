@@ -55,6 +55,8 @@ class OrbitalLoginGUI:
         self.root.resizable(False, False)
         
         self.click_times = []
+        self.root.bind("<Control-Shift-A>", lambda e: self.open_admin_gateway())
+        self.root.bind("<Control-Shift-a>", lambda e: self.open_admin_gateway())
         self._build_ui()
         
     def _on_logo_click(self, event=None):

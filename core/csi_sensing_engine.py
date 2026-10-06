@@ -191,9 +191,53 @@ class CSISensingEngine:
             "timestamp": t
         }
 
+    def sanitize_phases(self, phases):
+        """
+        Stage 1: Phase Sanitization
+        Eliminates CFO and SFO via linear unwrapping and slope subtraction:
+        phi_hat_i = phi_i - ((phi_N - phi_1) / (N - 1)) * i - (1/N) * sum(phi)
+        """
+        if not phases or len(phases) < 2:
+            return phases
+        unwrapped = np.unwrap(phases)
+        N = len(unwrapped)
+        slope = (unwrapped[-1] - unwrapped[0]) / max(N - 1, 1)
+        mean_phase = float(np.mean(unwrapped))
+        indices = np.arange(N)
+        sanitized = unwrapped - (slope * indices) - mean_phase
+        return sanitized.tolist()
+
+    def detect_through_wall_motion(self, amplitudes, phases):
+        """
+        Stage 3: Through-Wall Motion Detection via Covariance Eigenvalue Decomposition
+        Constructs complex channel vector H = |H| * e^(j*phi)
+        Covariance matrix C = H * H^H
+        Principal eigenvalue tracks device-free motion through barriers.
+        """
+        if not amplitudes or not phases:
+            return 0.0
+        amps = np.array(amplitudes)
+        phis = np.array(phases)
+        # Complex Channel Transfer Function H
+        H = amps * np.exp(1j * phis)
+        if len(H) < 4:
+            return 0.0
+        # Form spatial covariance
+        H_mat = H.reshape(-1, 1)
+        C = np.dot(H_mat, H_mat.conj().T)
+        eigenvalues = np.linalg.eigvalsh(C)
+        principal_ev = float(np.max(eigenvalues).real) if len(eigenvalues) > 0 else 0.0
+        return principal_ev
+
     def _process_frame(self, frame):
-        """Computes subcarrier variance and updates presence detection state."""
+        """Executes 3-stage signal processing and updates presence & respiration states."""
         with self.lock:
+            # 1. Phase Sanitization
+            raw_phases = frame.get("phases", [])
+            sanitized_phases = self.sanitize_phases(raw_phases)
+            frame["phases"] = sanitized_phases
+
+            # 2. Respiration & Subcarrier Variance
             self.latest_frame = frame
             self.total_frames_received += 1
             amps = np.array(frame["amplitudes"])
@@ -211,13 +255,16 @@ class CSISensingEngine:
             if self.total_frames_received < 30:
                 self.baseline_variance = np.mean(self.variance_history) if self.variance_history else 1.0
 
-            # Dynamic presence threshold: variance ratio
+            # 3. Through-wall motion eigenvalue
+            principal_metric = self.detect_through_wall_motion(frame["amplitudes"], sanitized_phases)
+            
+            # Presence confidence calculation
             current_var = self.variance_history[-1] if self.variance_history else 0.0
             ratio = current_var / max(self.baseline_variance, 0.01)
-
-            # Presence confidence mapped between 0.0 and 1.0
             self.presence_confidence = min(max((ratio - 1.0) / 2.0, 0.0), 1.0)
             self.presence_detected = self.presence_confidence > 0.35
+            self.through_wall_metric = round(principal_metric, 2)
+
 
     def get_status(self):
         """Returns the current sensing status, presence metric, and subcarrier spectrum."""
