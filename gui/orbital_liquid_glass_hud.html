@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body {
+      background-color: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+  </style>
+</head>
+<body class="p-3">
+  <div class="max-w-md mx-auto rounded-2xl border border-cyan-500/30 p-6 shadow-2xl relative overflow-hidden" style="background-color: #0B0E14;">
+    <!-- Top Branding -->
+    <div class="text-center mb-6">
+      <div id="ufo-logo" class="inline-block text-5xl cursor-pointer select-none transition-transform active:scale-95 hover:scale-110" title="Click me...">
+        🛸
+      </div>
+      <div class="text-xs text-cyan-400/60 font-mono tracking-widest mt-1" id="easter-egg-hint">CLICK LOGO 20x FOR GRAVITY GATEWAY</div>
+      <h1 class="text-xl font-bold tracking-widest text-slate-100 mt-2">O R B I T A L &nbsp; O S</h1>
+      <p class="text-xs text-cyan-400 font-semibold tracking-wider">AUTONOMOUS WORKSTATION GATEWAY</p>
+    </div>
+
+    <!-- Auth Card -->
+    <div class="rounded-xl p-5 border border-slate-800 shadow-inner" style="background-color: #121824;">
+      <div class="flex items-center justify-between mb-4">
+        <span class="text-xs font-bold text-cyan-400 tracking-wider">AUTHENTICATION</span>
+        <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">v34 LIVE</span>
+      </div>
+
+      <!-- Identifier -->
+      <label class="block text-xs text-slate-400 mb-1">Username / Email / Phone</label>
+      <input type="text" id="ident-input" value="Gravity" placeholder="Username, email, or phone" class="w-full text-sm rounded-lg px-3 py-2.5 mb-3 bg-slate-800 text-slate-100 border border-slate-700 focus:outline-none focus:border-cyan-400 font-mono" />
+
+      <!-- Password -->
+      <label class="block text-xs text-slate-400 mb-1">Password</label>
+      <input type="password" id="pass-input" value="••••••••••••" placeholder="Password" class="w-full text-sm rounded-lg px-3 py-2.5 mb-4 bg-slate-800 text-slate-100 border border-slate-700 focus:outline-none focus:border-cyan-400 font-mono" />
+
+      <!-- Login Button -->
+      <button id="login-btn" class="w-full font-bold text-xs tracking-wider py-2.5 rounded-lg text-slate-950 bg-cyan-400 hover:bg-cyan-300 active:scale-98 transition shadow-lg shadow-cyan-500/20">
+        LOGIN TO WORKSTATION
+      </button>
+
+      <!-- Sub Links -->
+      <div class="flex items-center justify-between mt-3 text-xs">
+        <button id="forgot-btn" class="text-cyan-400 hover:underline">Forgot Password?</button>
+        <span class="text-slate-500 text-[11px]">Direct GGUF + SD-Turbo</span>
+      </div>
+    </div>
+
+    <!-- Active Hardware Sensors Telemetry -->
+    <div class="mt-4 grid grid-cols-3 gap-2 text-center text-xs font-mono">
+      <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+        <div class="text-[10px] text-slate-400">NUCLEUS AI</div>
+        <div class="text-cyan-400 font-semibold text-[11px]">ACTIVE</div>
+      </div>
+      <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+        <div class="text-[10px] text-slate-400">NEBULA SD</div>
+        <div class="text-emerald-400 font-semibold text-[11px]">1-STEP</div>
+      </div>
+      <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+        <div class="text-[10px] text-slate-400">HARDWARE CSI</div>
+        <div class="text-purple-400 font-semibold text-[11px]">UDP:5555</div>
+      </div>
+    </div>
+
+    <!-- Console Log Display -->
+    <div id="status-box" class="mt-4 p-3 rounded-lg bg-slate-950 border border-slate-800/80 font-mono text-[11px] text-cyan-300/80 leading-relaxed min-h-[48px] flex items-center">
+      Ready. Desktop window launched via run_orbital.py.
+    </div>
+
+    <!-- Concealed Admin Modal -->
+    <div id="admin-modal" class="hidden absolute inset-0 bg-black/90 backdrop-blur-sm p-6 flex flex-col justify-center items-center text-center z-20">
+      <div class="text-3xl mb-2">👑</div>
+      <h3 class="text-sm font-bold text-amber-400 tracking-wider">GRAVITY ADMIN GATEWAY</h3>
+      <p class="text-xs text-slate-400 mb-4">Master Administrative Override Detected</p>
+      <input type="password" id="admin-key" placeholder="Enter Master Key (hint: gravity)" class="w-full text-xs rounded px-3 py-2 bg-slate-900 text-amber-300 border border-amber-500/50 mb-3 focus:outline-none font-mono" />
+      <div class="flex gap-2 w-full">
+        <button id="admin-unlock" class="flex-1 py-1.5 rounded text-xs font-bold bg-amber-400 text-slate-950 hover:bg-amber-300">UNLOCK</button>
+        <button id="admin-cancel" class="px-3 py-1.5 rounded text-xs text-slate-400 hover:text-white bg-slate-800">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let clickTimes = [];
+    const logo = document.getElementById('ufo-logo');
+    const adminModal = document.getElementById('admin-modal');
+    const statusBox = document.getElementById('status-box');
+    const hint = document.getElementById('easter-egg-hint');
+
+    logo.addEventListener('click', () => {
+      const now = Date.now();
+      clickTimes.push(now);
+      clickTimes = clickTimes.filter(t => now - t <= 4000);
+      
+      const remaining = 20 - clickTimes.length;
+      if (remaining > 0 && clickTimes.length > 3) {
+        hint.innerText = `CLICKS: ${clickTimes.length}/20 (${remaining} more in 4s)`;
+      }
+
+      if (clickTimes.length >= 20) {
+        clickTimes = [];
+        hint.innerText = "GRAVITY GATEWAY TRIGGERED";
+        adminModal.classList.remove('hidden');
+        statusBox.innerText = "[⚡ OVERRIDE] Concealed Gravity Admin Gateway unlocked!";
+      }
+    });
+
+    document.getElementById('admin-cancel').addEventListener('click', () => {
+      adminModal.classList.add('hidden');
+      hint.innerText = "CLICK LOGO 20x FOR GRAVITY GATEWAY";
+    });
+
+    document.getElementById('admin-unlock').addEventListener('click', () => {
+      const key = document.getElementById('admin-key').value;
+      if (key.trim().toLowerCase() === 'gravity') {
+        adminModal.classList.add('hidden');
+        statusBox.innerHTML = "<span class='text-amber-400'>[👑 ADMIN GRANTED] Root access active. P2P Ghost Stream connected.</span>";
+      } else {
+        statusBox.innerHTML = "<span class='text-red-400'>[!] Invalid Master Key. Access Denied.</span>";
+      }
+    });
+
+    document.getElementById('login-btn').addEventListener('click', () => {
+      const ident = document.getElementById('ident-input').value.trim();
+      if (!ident) {
+        statusBox.innerText = "[!] Please enter your identifier.";
+        return;
+      }
+      statusBox.innerHTML = `[✔] Authenticated as <span class='text-cyan-400'>${ident}</span>. Post-login workstation active.`;
+    });
+
+    document.getElementById('forgot-btn').addEventListener('click', () => {
+      const ident = prompt("Account Recovery - Enter your Username, Email, or Phone:");
+      if (ident) {
+        statusBox.innerText = `[🔒 RECOVERY] Masked verification link dispatched for: ${ident}`;
+      }
+    });
+  </script>
+</body>
+</html>
+
