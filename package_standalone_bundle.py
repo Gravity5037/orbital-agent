@@ -12,7 +12,7 @@ def build_standalone_package():
     output_zip = os.path.join(base_dir, "Orbital_Standalone_Setup.zip")
 
     # Folders to explicitly include
-    include_folders = ["core", "gui", "assets", "Nucleus", "shared", "web_files", "users"]
+    include_folders = ["core", "gui", "assets", "Nucleus", "shared", "web_files", "skills"]
     
     # Root files to explicitly include
     include_root_files = [
@@ -30,7 +30,7 @@ def build_standalone_package():
         "test_all_orbital_v32.py",
         "evolution_loop.py",
         "Modelfile",
-        "users_db.json"
+        "progress.txt"
     ]
 
     print(f"[*] Target standalone archive: {output_zip}")

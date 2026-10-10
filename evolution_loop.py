@@ -34,19 +34,19 @@ def run_ralph_evolution_daemon():
     print("=========================================================")
 
     audited, errors = verify_codebase_integrity()
-    print(f"[✔] Audited {audited} python scripts across Orbital OS.")
+    print(f"[OK] Audited {audited} python scripts across Orbital OS.")
     if errors:
         print(f"[!] Warning: Detected {len(errors)} syntax anomalies in self-inspection:")
         for fn, err in errors:
             print(f"    - {fn}: {err}")
     else:
-        print("[✔] Zero AST syntax errors. Codebase integrity: 100% HEALTHY.")
+        print("[OK] Zero AST syntax errors. Codebase integrity: 100% HEALTHY.")
 
     # Check AI Engine Socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     ai_status = "ONLINE" if sock.connect_ex(('127.0.0.1', 11434)) == 0 else "STANDBY"
     sock.close()
-    print(f"[✔] Local AI Nucleus Socket: {ai_status}")
+    print(f"[OK] Local AI Nucleus Socket: {ai_status}")
 
     progress_file = r"C:\Orbital\progress.txt"
     with open(progress_file, "a", encoding="utf-8") as f:

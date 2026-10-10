@@ -27,6 +27,15 @@ def process_chat(user_input, mode="text", image_path=None):
     except Exception:
         pass
 
+    # 2. Check Dynamic Skills Registry (C:\Orbital\skills)
+    try:
+        from skill_registry import skill_registry
+        matched_skill = skill_registry.match_skill(stripped)
+        if matched_skill:
+            return skill_registry.execute_skill(matched_skill, stripped)
+    except Exception:
+        pass
+
     if mode == "visual" or stripped.startswith("/draw") or stripped.startswith("/generate"):
         prompt = stripped.replace("/draw", "").replace("/generate", "").strip()
         res = generate_visual_lazy(prompt)
