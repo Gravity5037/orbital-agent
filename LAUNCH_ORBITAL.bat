@@ -1,5 +1,9 @@
 @echo off
-TITLE Orbital OS - Universal Workstation
+TITLE Orbital OS Master Workstation
 cd /d "%~dp0"
-echo [*] Launching Orbital OS Universal Workstation...
-start "" pythonw run_orbital.py
+where pythonw >nul 2>&1
+if %errorlevel% equ 0 (
+    start "" pythonw run_orbital.py
+) else (
+    start "" python run_orbital.py
+)

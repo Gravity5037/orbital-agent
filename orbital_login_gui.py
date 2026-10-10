@@ -394,5 +394,12 @@ class OrbitalAuthApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    for ico in [r"C:\Orbital\orbital_cyber_logo.ico", r"C:\Orbital\assets\orbital_cyber_logo.ico", r"C:\Orbital\orbital_logo.ico"]:
+        if os.path.exists(ico):
+            try:
+                root.iconbitmap(ico)
+                break
+            except Exception:
+                pass
     app = OrbitalAuthApp(root)
     root.mainloop()

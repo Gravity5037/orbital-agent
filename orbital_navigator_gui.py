@@ -949,5 +949,12 @@ class OrbitalNavigatorWorkstation:
 if __name__ == "__main__":
     user = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else "Operator"
     root = tk.Tk()
+    for ico in [r"C:\Orbital\orbital_cyber_logo.ico", r"C:\Orbital\assets\orbital_cyber_logo.ico", r"C:\Orbital\orbital_logo.ico"]:
+        if os.path.exists(ico):
+            try:
+                root.iconbitmap(ico)
+                break
+            except Exception:
+                pass
     app = OrbitalNavigatorWorkstation(root, username=user)
     root.mainloop()
