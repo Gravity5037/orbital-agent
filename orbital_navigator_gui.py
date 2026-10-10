@@ -47,30 +47,32 @@ PALETTES = {
 
 def load_db():
     os.makedirs(r"C:\Orbital", exist_ok=True)
-    os.makedirs(r"C:\Orbital\core", exist_ok=True)
-    os.makedirs(r"C:\Orbital\gui", exist_ok=True)
-    os.makedirs(r"C:\Orbital\users", exist_ok=True)
-    os.makedirs(r"C:\Orbital\shared", exist_ok=True)
-    os.makedirs(r"C:\Orbital\web_files", exist_ok=True)
+try:
+    sys.path.append(r"C:\Orbital\core")
+    from cloud_hive_adapter import hive_adapter
+except Exception:
+    hive_adapter = None
 
+def load_db():
+    if hive_adapter:
+        return hive_adapter.load_users_db()
     if os.path.exists(DB_PATH):
         try:
             with open(DB_PATH, "r", encoding="utf-8") as f:
-                db = json.load(f)
-                for k in ["users", "cooldowns", "inbox", "friends", "friend_requests"]:
-                    if k not in db or not isinstance(db[k], dict): db[k] = {}
-                return db
+                return json.load(f)
         except Exception:
             pass
-    db = {"users": {}, "cooldowns": {}, "inbox": {}, "friends": {}, "friend_requests": {}}
-    save_db(db)
-    return db
+    return {"users": {}, "cooldowns": {}, "inbox": {}, "friends": {}, "friend_requests": {}}
 
 def save_db(db):
-    for k in ["users", "cooldowns", "inbox", "friends", "friend_requests"]:
-        if k not in db or not isinstance(db[k], dict): db[k] = {}
-    with open(DB_PATH, "w", encoding="utf-8") as f:
-        json.dump(db, f, indent=4)
+    if hive_adapter:
+        hive_adapter.save_users_db(db)
+        return
+    try:
+        with open(DB_PATH, "w", encoding="utf-8") as f:
+            json.dump(db, f, indent=4)
+    except Exception:
+        pass
 
 def ensure_nucleus_running():
     try:
@@ -471,6 +473,8 @@ class OrbitalNavigatorWorkstation:
             OnboardingWizard(self.root, self.username, self.palette, on_complete=self._refresh_theme_from_db)
 
     def _load_user_memory(self):
+        if hive_adapter:
+            return hive_adapter.load_user_memory(self.username)
         if os.path.exists(self.memory_path):
             try:
                 with open(self.memory_path, "r", encoding="utf-8") as f:
@@ -482,8 +486,14 @@ class OrbitalNavigatorWorkstation:
 
     def _save_user_memory(self, mem=None):
         if mem is not None: self.user_memory = mem
-        with open(self.memory_path, "w", encoding="utf-8") as f:
-            json.dump(self.user_memory, f, indent=4)
+        if hive_adapter:
+            hive_adapter.save_user_memory(self.username, self.user_memory)
+            return
+        try:
+            with open(self.memory_path, "w", encoding="utf-8") as f:
+                json.dump(self.user_memory, f, indent=4)
+        except Exception:
+            pass
 
     def _start_background_sync_watcher(self):
         def watcher():
@@ -606,6 +616,10 @@ class OrbitalNavigatorWorkstation:
         input_frame = tk.Frame(f, bg=self.palette["bg"], pady=8)
         input_frame.pack(fill=tk.X, pady=(10, 0))
 
+        self.attached_image_path = None
+        self.attach_btn = tk.Button(input_frame, text="📎 Image", font=("Consolas", 10, "bold"), fg=self.palette["text"], bg=self.palette["card"], bd=1, relief="solid", padx=10, pady=6, command=self._attach_image)
+        self.attach_btn.pack(side=tk.LEFT, padx=(0, 6))
+
         self.entry = tk.Entry(input_frame, font=("Consolas", 11), bg=self.palette["card"], fg=self.palette["text"], insertbackground=self.palette["text"], bd=1, relief="solid")
         self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 8), ipady=6)
         self.entry.bind("<Return>", lambda e: self.send_chat())
@@ -614,6 +628,15 @@ class OrbitalNavigatorWorkstation:
         send_btn.pack(side=tk.RIGHT)
 
         self._append_chat("System", f"Orbital Workstation Active for {self.username}. Memory Store Loaded ({len(self.user_memory.get('conversations', []))} logs). Ready.")
+
+    def _attach_image(self):
+        from tkinter import filedialog
+        f = filedialog.askopenfilename(title="Attach Image / UI Screenshot", filetypes=[("Images", "*.png;*.jpg;*.jpeg;*.bmp;*.webp")])
+        if f:
+            self.attached_image_path = f
+            fn = os.path.basename(f)
+            self.attach_btn.config(text=f"📎 {fn[:8]}..", bg=self.palette["accent_glow"], fg="#0b0d17")
+            self._append_chat("System", f"Image attached: {fn}. Drop your instructions or ask Ralph to self-update.")
 
     def _append_chat(self, sender, text):
         self.chat_text.config(state="normal")
@@ -625,23 +648,31 @@ class OrbitalNavigatorWorkstation:
 
     def send_chat(self):
         val = self.entry.get().strip()
-        if not val: return
+        img = self.attached_image_path
+        if not val and not img: return
         self.entry.delete(0, tk.END)
-        self._append_chat("You", val)
-        self.user_memory["conversations"].append({"timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "prompt": val})
+        self.attached_image_path = None
+        self.attach_btn.config(text="📎 Image", bg=self.palette["card"], fg=self.palette["text"])
+
+        display_text = val if val else "[Image Analysis Request]"
+        if img:
+            display_text = f"{display_text}\n[Attached: {os.path.basename(img)}]"
+
+        self._append_chat("You", display_text)
+        self.user_memory["conversations"].append({"timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "prompt": val, "image": img})
         self._save_user_memory()
 
-        threading.Thread(target=self._query_ai, args=(val,), daemon=True).start()
+        threading.Thread(target=self._query_ai, args=(val or "Inspect attached image", img), daemon=True).start()
 
-    def _query_ai(self, prompt):
+    def _query_ai(self, prompt, image_path=None):
         try:
             import sys
             sys.path.append(r"C:\Orbital\core")
             from core.engine import Engine
             if not hasattr(self, "_orbital_engine") or self._orbital_engine is None:
-                self.root.after(0, lambda: self._append_chat("System", "⚡ Connecting to Nucleus AI..."))
+                self.root.after(0, lambda: self._append_chat("System", "⚡ Connecting to Nucleus AI & Ralph Engine..."))
                 self._orbital_engine = Engine()
-            reply = self._orbital_engine.route_query(prompt)
+            reply = self._orbital_engine.route_query(prompt, image_path=image_path)
             self.root.after(0, lambda: self._append_chat("Orbital", str(reply)))
         except Exception as e:
             self.root.after(0, lambda: self._append_chat("Orbital Error", f"Engine notice: {e}"))
@@ -904,27 +935,17 @@ class OrbitalNavigatorWorkstation:
 
     def _share_fact_to_hive(self):
         fact = f"Instance '{self.username}' observed system node status active at {time.strftime('%H:%M:%S')}."
-        hive_file = r"C:\Orbital\shared\hive_knowledge_base.json"
-        data = []
-        if os.path.exists(hive_file):
-            try:
-                with open(hive_file, "r", encoding="utf-8") as f: data = json.load(f)
-            except Exception: pass
-        data.append({"author": self.username, "fact": fact, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")})
-        with open(hive_file, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
+        if hive_adapter:
+            hive_adapter.share_fact_to_hive(self.username, fact)
         messagebox.showinfo("Knowledge Shared", f"Shared insight to Hive Mind:\n{fact}")
         self._refresh_hive_text()
 
     def _sync_facts_from_hive(self):
-        hive_file = r"C:\Orbital\shared\hive_knowledge_base.json"
-        if os.path.exists(hive_file):
-            try:
-                with open(hive_file, "r", encoding="utf-8") as f: data = json.load(f)
-                self.user_memory["learned_facts"] = data
-                self._save_user_memory()
-                messagebox.showinfo("Hive Sync", f"Merged {len(data)} insights into local memory store!")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to sync: {e}")
+        if hive_adapter:
+            data = hive_adapter.load_hive_knowledge()
+            self.user_memory["learned_facts"] = data
+            self._save_user_memory()
+            messagebox.showinfo("Hive Sync", f"Synced {len(data)} insights from Cloud Hive Mind!")
         self._refresh_hive_text()
 
     def _refresh_hive_text(self):
@@ -932,16 +953,13 @@ class OrbitalNavigatorWorkstation:
         self.hive_text.delete("1.0", tk.END)
         self.hive_text.insert(tk.END, "🧠 GLOBAL HIVE MIND SHARED KNOWLEDGE BASE:\n" + "="*50 + "\n\n")
 
-        hive_file = r"C:\Orbital\shared\hive_knowledge_base.json"
-        if os.path.exists(hive_file):
-            try:
-                with open(hive_file, "r", encoding="utf-8") as f: data = json.load(f)
-                for item in data:
-                    a = item.get("author", "Anon")
-                    ft = item.get("fact", "")
-                    ts = item.get("timestamp", "")
-                    self.hive_text.insert(tk.END, f"[{ts}] {a}: {ft}\n")
-            except Exception: pass
+        facts = hive_adapter.load_hive_knowledge() if hive_adapter else []
+        if facts:
+            for item in facts:
+                a = item.get("author", "Anon")
+                ft = item.get("fact", "")
+                ts = item.get("timestamp", "")
+                self.hive_text.insert(tk.END, f"[{ts}] {a}: {ft}\n")
         else:
             self.hive_text.insert(tk.END, "No shared hive insights yet. Click 'Share Fact' to post.\n")
         self.hive_text.config(state="disabled")

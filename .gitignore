@@ -10,3 +10,10 @@ outputs/
 _archive/
 dist/
 *.tmp
+
+# Decoupled User Data & Cloud Sync (Never committed to code)
+users/
+users_db.json
+*.db
+shared/hive_knowledge_base.json
+core/ralph_state.json

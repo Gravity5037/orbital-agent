@@ -41,32 +41,32 @@ PALETTES = {
     }
 }
 
-def load_db():
-    os.makedirs(r"C:\Orbital", exist_ok=True)
-    os.makedirs(r"C:\Orbital\core", exist_ok=True)
-    os.makedirs(r"C:\Orbital\gui", exist_ok=True)
-    os.makedirs(r"C:\Orbital\users", exist_ok=True)
-    os.makedirs(r"C:\Orbital\shared", exist_ok=True)
-    os.makedirs(r"C:\Orbital\web_files", exist_ok=True)
+try:
+    sys.path.append(r"C:\Orbital\core")
+    from cloud_hive_adapter import hive_adapter
+except Exception:
+    hive_adapter = None
 
+def load_db():
+    if hive_adapter:
+        return hive_adapter.load_users_db()
     if os.path.exists(DB_PATH):
         try:
             with open(DB_PATH, "r", encoding="utf-8") as f:
-                db = json.load(f)
-                for k in ["users", "cooldowns", "inbox", "friends", "friend_requests"]:
-                    if k not in db or not isinstance(db[k], dict): db[k] = {}
-                return db
+                return json.load(f)
         except Exception:
             pass
-    db = {"users": {}, "cooldowns": {}, "inbox": {}, "friends": {}, "friend_requests": {}}
-    save_db(db)
-    return db
+    return {"users": {}, "cooldowns": {}, "inbox": {}, "friends": {}, "friend_requests": {}}
 
 def save_db(db):
-    for k in ["users", "cooldowns", "inbox", "friends", "friend_requests"]:
-        if k not in db or not isinstance(db[k], dict): db[k] = {}
-    with open(DB_PATH, "w", encoding="utf-8") as f:
-        json.dump(db, f, indent=4)
+    if hive_adapter:
+        hive_adapter.save_users_db(db)
+        return
+    try:
+        with open(DB_PATH, "w", encoding="utf-8") as f:
+            json.dump(db, f, indent=4)
+    except Exception:
+        pass
 
 def check_username_available(username, db):
     u_clean = username.strip()
