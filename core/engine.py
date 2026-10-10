@@ -8,24 +8,25 @@ except ImportError:
     def query_nucleus(prompt, system_prompt=None):
         return f"[Nucleus Direct] Processed: {prompt}"
 
-try:
-    from nebula_engine import generate_visual
-except ImportError:
-    def generate_visual(prompt, output_path=None, is_video=False):
-        return {"status": "simulated", "prompt": prompt}
+def generate_visual_lazy(prompt, output_path=None, is_video=False):
+    try:
+        from nebula_engine import generate_visual
+        return generate_visual(prompt, output_path=output_path, is_video=is_video)
+    except Exception as e:
+        return f"[Nebula Engine Warning: PyTorch/Diffusers offline] {e}"
 
 def process_chat(user_input, mode="text"):
     stripped = user_input.strip()
     if mode == "visual" or stripped.startswith("/draw") or stripped.startswith("/generate"):
         prompt = stripped.replace("/draw", "").replace("/generate", "").strip()
-        res = generate_visual(prompt)
+        res = generate_visual_lazy(prompt)
         res_path = res.get('path', res) if isinstance(res, dict) else str(res)
-        return f"[Nebula Creative Engine Renders]: {res_path}"
+        return f"[Nebula Creative Engine]: {res_path}"
     elif stripped.lower().startswith("draw "):
         prompt = stripped[5:].strip()
-        res = generate_visual(prompt)
+        res = generate_visual_lazy(prompt)
         res_path = res.get('path', res) if isinstance(res, dict) else str(res)
-        return f"[Nebula Creative Engine Renders]: {res_path}"
+        return f"[Nebula Creative Engine]: {res_path}"
     else:
         return query_nucleus(user_input)
 
@@ -37,4 +38,4 @@ class Engine:
         return process_chat(prompt, mode=mode)
 
 if __name__ == "__main__":
-    print(process_chat("System status query"))
+    print(process_chat("Hello Orbital AI, who are you?"))
