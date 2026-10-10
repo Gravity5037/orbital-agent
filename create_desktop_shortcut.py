@@ -4,9 +4,11 @@ import subprocess
 
 def create_desktop_shortcut():
     base_dir = os.path.abspath(os.path.dirname(__file__))
-    logo_path = os.path.join(base_dir, "orbital_logo.ico")
+    logo_path = os.path.join(base_dir, "orbital_cyber_logo.ico")
     if not os.path.exists(logo_path):
-        logo_path = os.path.join(base_dir, "assets", "orbital_logo.ico")
+        logo_path = os.path.join(base_dir, "assets", "orbital_cyber_logo.ico")
+    if not os.path.exists(logo_path):
+        logo_path = os.path.join(base_dir, "orbital_logo.ico")
 
     pyw_path = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
     if not os.path.exists(pyw_path):
@@ -28,7 +30,17 @@ if (Test-Path "{logo_path}") {{
     $Shortcut.IconLocation = "{logo_path},0"
 }}
 $Shortcut.Save()
-Write-Host "[OK] Desktop Shortcut created successfully: $ShortcutPath"
+
+# Force Windows Shell to invalidate icon cache and refresh Desktop
+$code = @'
+[System.Runtime.InteropServices.DllImport("shell32.dll")]
+public static extern void SHChangeNotify(int wEventId, int uFlags, int dwItem1, int dwItem2);
+'@
+Add-Type -MemberDefinition $code -Namespace ShellRefresh -Name WinAPI -ErrorAction SilentlyContinue
+[ShellRefresh.WinAPI]::SHChangeNotify(0x08000000, 0, 0, 0)
+ie4uinit.exe -show 2>$null
+
+Write-Host "[OK] Desktop Shortcut created and Shell refreshed: $ShortcutPath"
 '''
 
     try:

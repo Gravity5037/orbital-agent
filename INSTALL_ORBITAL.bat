@@ -45,6 +45,9 @@ if not exist "web_files" mkdir web_files
 if exist "orbital_logo.ico" (
     copy /Y "orbital_logo.ico" "assets\orbital_logo.ico" >nul 2>&1
 )
+if exist "orbital_cyber_logo.ico" (
+    copy /Y "orbital_cyber_logo.ico" "assets\orbital_cyber_logo.ico" >nul 2>&1
+)
 if exist "orbital_logo.png" (
     copy /Y "orbital_logo.png" "assets\orbital_logo.png" >nul 2>&1
 )
