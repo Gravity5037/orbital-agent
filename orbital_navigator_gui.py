@@ -534,6 +534,10 @@ class OrbitalNavigatorWorkstation:
         title = tk.Label(self.top_bar, text=f"🛸 ORBITAL WORKSTATION // {self.username.upper()}", font=("Consolas", 12, "bold"), fg=self.palette["accent"], bg=self.palette["bg"])
         title.pack(side=tk.LEFT)
 
+        if self.username == "Gravity":
+            admin_badge = tk.Label(self.top_bar, text="👑 Master Administrator", font=("Consolas", 8, "bold"), fg="#a78bfa", bg=self.palette["bg"])
+            admin_badge.pack(side=tk.LEFT, padx=(10, 0))
+
         self.sync_badge = tk.Label(self.top_bar, text="🟢 GitHub Sync: Active (Every 5m)", font=("Consolas", 8, "bold"), fg=self.palette["muted"], bg=self.palette["bg"])
         self.sync_badge.pack(side=tk.LEFT, padx=(15, 0))
 
@@ -569,6 +573,10 @@ class OrbitalNavigatorWorkstation:
             btn.pack(fill=tk.X, pady=2)
             self.nav_buttons[key] = btn
 
+        if self.username == "Gravity":
+            admin_matrix_btn = tk.Button(self.nav_frame, text="🌐 Admin Cloud Matrix", font=("Consolas", 10, "bold"), fg="#ffffff", bg="#8b5cf6", activebackground="#7c3aed", bd=0, anchor="w", padx=15, pady=8, command=self._open_admin_matrix)
+            admin_matrix_btn.pack(fill=tk.X, pady=(15, 2))
+
         self.frames = {}
         for _, key in tabs:
             f = tk.Frame(self.main_content, bg=self.palette["bg"])
@@ -587,6 +595,16 @@ class OrbitalNavigatorWorkstation:
 
     def _open_settings(self):
         SettingsModal(self.root, self.username, self.palette, on_theme_change=self.apply_theme)
+
+    def _open_admin_matrix(self):
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        target = os.path.join(app_dir, "orbital_admin_cloud_gui.py")
+        if not os.path.exists(target):
+            target = os.path.join(r"C:\Orbital\gui", "orbital_admin_cloud_gui.py")
+        creationflags = 0x08000000 if sys.platform == "win32" else 0
+        pyw = sys.executable.replace("python.exe", "pythonw.exe")
+        cmd = [pyw if os.path.exists(pyw) else sys.executable, target]
+        subprocess.Popen(cmd, creationflags=creationflags, cwd=r"C:\Orbital")
 
     def switch_tab(self, key):
         for k, btn in self.nav_buttons.items():
@@ -659,6 +677,8 @@ class OrbitalNavigatorWorkstation:
             display_text = f"{display_text}\n[Attached: {os.path.basename(img)}]"
 
         self._append_chat("You", display_text)
+        if "conversations" not in self.user_memory or not isinstance(self.user_memory["conversations"], list):
+            self.user_memory["conversations"] = []
         self.user_memory["conversations"].append({"timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "prompt": val, "image": img})
         self._save_user_memory()
 
@@ -667,10 +687,13 @@ class OrbitalNavigatorWorkstation:
     def _query_ai(self, prompt, image_path=None):
         try:
             import sys
-            sys.path.append(r"C:\Orbital\core")
+            if r"C:\Orbital" not in sys.path:
+                sys.path.insert(0, r"C:\Orbital")
+            if r"C:\Orbital\core" not in sys.path:
+                sys.path.insert(0, r"C:\Orbital\core")
             from core.engine import Engine
             if not hasattr(self, "_orbital_engine") or self._orbital_engine is None:
-                self.root.after(0, lambda: self._append_chat("System", "⚡ Connecting to Nucleus AI & Ralph Engine..."))
+                self.root.after(0, lambda: self._append_chat("System", "[AI] Connecting to Nucleus & Ralph Engine..."))
                 self._orbital_engine = Engine()
             reply = self._orbital_engine.route_query(prompt, image_path=image_path)
             self.root.after(0, lambda: self._append_chat("Orbital", str(reply)))
@@ -869,6 +892,10 @@ class OrbitalNavigatorWorkstation:
     def _refresh_dm_users(self):
         db = load_db()
         users = [u for u in db.get("users", {}).keys() if u != self.username]
+        if "Orbital (AI Core)" not in users:
+            users.insert(0, "Orbital (AI Core)")
+        if self.username != "Gravity" and "Gravity (Admin)" not in users and "Gravity" not in users:
+            users.insert(1, "Gravity (Admin)")
         self.dm_target_combo["values"] = users
         if users: self.dm_target_var.set(users[0])
 
@@ -892,6 +919,30 @@ class OrbitalNavigatorWorkstation:
         self.dm_input.delete(0, tk.END)
         messagebox.showinfo("DM Sent", f"Direct message sent to '{target}'!")
         self._refresh_inbox_messages()
+
+        # If user messaged Orbital AI Core, generate automatic reply in inbox
+        if target in ["Orbital (AI Core)", "Orbital"]:
+            def generate_ai_inbox_response():
+                try:
+                    import sys
+                    if r"C:\Orbital" not in sys.path: sys.path.insert(0, r"C:\Orbital")
+                    if r"C:\Orbital\core" not in sys.path: sys.path.insert(0, r"C:\Orbital\core")
+                    from core.engine import Engine
+                    eng = Engine()
+                    reply = eng.route_query(txt)
+                    db_fresh = load_db()
+                    if "inbox" not in db_fresh: db_fresh["inbox"] = {}
+                    if self.username not in db_fresh["inbox"]: db_fresh["inbox"][self.username] = []
+                    db_fresh["inbox"][self.username].append({
+                        "sender": "Orbital (AI Core)",
+                        "text": str(reply),
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+                    })
+                    save_db(db_fresh)
+                    self.root.after(0, self._refresh_inbox_messages)
+                except Exception as ex:
+                    print(f"[!] AI inbox responder fault: {ex}")
+            threading.Thread(target=generate_ai_inbox_response, daemon=True).start()
 
     def _refresh_inbox_messages(self):
         self.msg_box.config(state="normal")

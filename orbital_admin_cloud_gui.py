@@ -9,13 +9,15 @@ from tkinter import ttk, messagebox
 
 DB_PATH = r"C:\Orbital\users_db.json"
 
-def load_db():
-    os.makedirs(r"C:\Orbital", exist_ok=True)
-    os.makedirs(r"C:\Orbital\core", exist_ok=True)
-    os.makedirs(r"C:\Orbital\gui", exist_ok=True)
-    os.makedirs(r"C:\Orbital\users", exist_ok=True)
-    os.makedirs(r"C:\Orbital\shared", exist_ok=True)
+try:
+    sys.path.append(r"C:\Orbital\core")
+    from cloud_hive_adapter import hive_adapter
+except Exception:
+    hive_adapter = None
 
+def load_db():
+    if hive_adapter:
+        return hive_adapter.load_users_db()
     if os.path.exists(DB_PATH):
         try:
             with open(DB_PATH, "r", encoding="utf-8") as f:
@@ -30,6 +32,9 @@ def load_db():
     return db
 
 def save_db(db):
+    if hive_adapter:
+        hive_adapter.save_users_db(db)
+        return
     if "users" not in db: db["users"] = {}
     if "cooldowns" not in db: db["cooldowns"] = {}
     with open(DB_PATH, "w", encoding="utf-8") as f:
@@ -58,7 +63,10 @@ class AdminCloudApp:
         sync_btn.pack(side=tk.RIGHT, padx=(10, 0))
 
         add_inst_btn = tk.Button(top_bar, text="➕ Add User Instance", font=("Consolas", 9, "bold"), fg="#ffffff", bg="#8b5cf6", bd=0, padx=12, pady=4, command=self._add_instance_dialog)
-        add_inst_btn.pack(side=tk.RIGHT)
+        add_inst_btn.pack(side=tk.RIGHT, padx=(10, 0))
+
+        ws_btn = tk.Button(top_bar, text="🚀 Launch Gravity Workstation", font=("Consolas", 9, "bold"), fg="#03131e", bg="#00f2fe", bd=0, padx=12, pady=4, command=self._launch_gravity_workstation)
+        ws_btn.pack(side=tk.RIGHT)
 
         body = tk.Frame(self.root, bg="#0a0e1a")
         body.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 15))
@@ -89,6 +97,16 @@ class AdminCloudApp:
 
         self._render_cloud()
 
+    def _launch_gravity_workstation(self):
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        target = os.path.join(app_dir, "orbital_navigator_gui.py")
+        if not os.path.exists(target):
+            target = os.path.join(r"C:\Orbital\gui", "orbital_navigator_gui.py")
+        creationflags = 0x08000000 if sys.platform == "win32" else 0
+        pyw = sys.executable.replace("python.exe", "pythonw.exe")
+        cmd = [pyw if os.path.exists(pyw) else sys.executable, target, "Gravity"]
+        subprocess.Popen(cmd, creationflags=creationflags, cwd=r"C:\Orbital")
+
     def _sync_github(self):
         try:
             res = subprocess.run(["git", "pull", "--rebase", "origin", "main"], cwd=r"C:\Orbital", capture_output=True, text=True)
@@ -104,10 +122,12 @@ class AdminCloudApp:
         self.db = load_db()
 
         cx, cy = 300, 300
-        self.canvas.create_oval(cx-30, cy-30, cx+30, cy+30, fill="#8b5cf6", outline="#a78bfa", width=2)
-        self.canvas.create_text(cx, cy, text="GRAVITY\n(Admin)", font=("Consolas", 9, "bold"), fill="#ffffff")
+        c_adm = self.canvas.create_oval(cx-30, cy-30, cx+30, cy+30, fill="#8b5cf6", outline="#a78bfa", width=2, tags=("admin_node", "Gravity"))
+        t_adm = self.canvas.create_text(cx, cy, text="GRAVITY\n(Admin)", font=("Consolas", 9, "bold"), fill="#ffffff", tags=("admin_node", "Gravity"))
+        self.canvas.tag_bind(c_adm, "<Button-1>", lambda e: self._select_user("Gravity"))
+        self.canvas.tag_bind(t_adm, "<Button-1>", lambda e: self._select_user("Gravity"))
 
-        users = list(self.db.get("users", {}).keys())
+        users = [u for u in self.db.get("users", {}).keys() if u != "Gravity"]
         radius = 160
         for i, u in enumerate(users):
             angle = (2 * 3.14159 / max(len(users), 1)) * i
@@ -125,6 +145,15 @@ class AdminCloudApp:
 
     def _select_user(self, username):
         self.selected_user = username
+        if username == "Gravity":
+            self.user_lbl.config(text="User: Gravity (Master Administrator)\nStatus: ACTIVE (Elevated)\nRole: System Administrator")
+            self.btn_block.config(state="disabled")
+            self.btn_maint.config(state="disabled")
+            self.btn_delete.config(state="disabled")
+            return
+        self.btn_block.config(state="normal")
+        self.btn_maint.config(state="normal")
+        self.btn_delete.config(state="normal")
         u_data = self.db["users"].get(username, {})
         st = u_data.get("status", "active")
         self.user_lbl.config(text=f"User: {username}\nStatus: {st.upper()}\nContact: {u_data.get('contact', 'N/A')}")
@@ -186,7 +215,7 @@ class AdminCloudApp:
         creationflags = 0x08000000 if sys.platform == "win32" else 0
         pyw = sys.executable.replace("python.exe", "pythonw.exe")
         cmd = [pyw if os.path.exists(pyw) else sys.executable, target, self.selected_user]
-        subprocess.Popen(cmd, creationflags=creationflags)
+        subprocess.Popen(cmd, creationflags=creationflags, cwd=r"C:\Orbital")
 
     def _delete_instance(self):
         if not self.selected_user: return

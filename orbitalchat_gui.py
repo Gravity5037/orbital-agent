@@ -150,16 +150,28 @@ class OrbitalNavigatorWorkstation:
         threading.Thread(target=self._query_ai, args=(val,), daemon=True).start()
 
     def _query_ai(self, prompt):
-        ensure_nucleus_running()
-        payload = json.dumps({"model": MODEL_NAME, "messages": [{"role": "user", "content": prompt}], "stream": False}).encode("utf-8")
-        req = urllib.request.Request(OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            payload = json.dumps({"model": MODEL_NAME, "messages": [{"role": "user", "content": prompt}], "stream": False}).encode("utf-8")
+            req = urllib.request.Request(OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=3.0) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 reply = data.get("message", {}).get("content", "Received prompt.")
                 self.root.after(0, lambda: self._append_chat("Orbital", reply))
+                return
+        except Exception:
+            pass
+
+        # Direct In-Process Nucleus & Ralph Engine Fallback
+        try:
+            import sys
+            if r"C:\Orbital" not in sys.path: sys.path.insert(0, r"C:\Orbital")
+            if r"C:\Orbital\core" not in sys.path: sys.path.insert(0, r"C:\Orbital\core")
+            from core.engine import Engine
+            eng = Engine()
+            reply = eng.route_query(prompt)
+            self.root.after(0, lambda: self._append_chat("Orbital", str(reply)))
         except Exception as e:
-            self.root.after(0, lambda: self._append_chat("Orbital Error", f"Nucleus Connection: {e}"))
+            self.root.after(0, lambda: self._append_chat("Orbital Error", f"Engine notice: {e}"))
 
     def _build_presence_tab(self):
         f = self.frames["presence"]

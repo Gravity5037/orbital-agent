@@ -304,9 +304,7 @@ class OrbitalAuthApp:
 
         if self.mode == "login":
             if username == ADMIN_USER and passcode == ADMIN_PASS:
-                messagebox.showinfo("Admin Authenticated", "Welcome, System Administrator Gravity!")
-                self.root.destroy()
-                self._launch_admin_cloud()
+                self._show_admin_portal()
                 return
 
             if username not in self.db.get("users", {}):
@@ -369,6 +367,42 @@ class OrbitalAuthApp:
             self.root.destroy()
             self._launch_user_navigator(username, is_new=True)
 
+    def _show_admin_portal(self):
+        self.root.withdraw()
+        dlg = tk.Toplevel()
+        dlg.title("Orbital Administrator Gateway - Gravity Core")
+        dlg.geometry("520x350")
+        dlg.configure(bg=self.palette["bg"])
+        dlg.resizable(False, False)
+
+        tk.Label(dlg, text="👑 Master Administrator Authenticated", font=("Consolas", 13, "bold"), fg=self.palette["accent"], bg=self.palette["bg"]).pack(pady=(22, 5))
+        tk.Label(dlg, text="Welcome back, Gravity. Choose how you want to access Orbital OS:", font=("Consolas", 9), fg=self.palette["muted"], bg=self.palette["bg"]).pack(pady=(0, 20))
+
+        def launch_ws():
+            dlg.destroy()
+            self.root.destroy()
+            self._launch_user_navigator("Gravity", is_new=False)
+
+        def launch_matrix():
+            dlg.destroy()
+            self.root.destroy()
+            self._launch_admin_cloud()
+
+        def launch_both():
+            dlg.destroy()
+            self.root.destroy()
+            self._launch_user_navigator("Gravity", is_new=False)
+            self._launch_admin_cloud()
+
+        b1 = tk.Button(dlg, text="🚀 Launch Admin Workstation Instance (Gravity)", font=("Consolas", 10, "bold"), fg=self.palette["btn_text"], bg=self.palette["accent"], bd=0, padx=16, pady=8, command=launch_ws)
+        b1.pack(fill=tk.X, padx=40, pady=6)
+
+        b2 = tk.Button(dlg, text="🌐 Open Cloud Matrix & User Inspector", font=("Consolas", 10, "bold"), fg=self.palette["text"], bg=self.palette["entry_bg"], bd=0, padx=16, pady=8, command=launch_matrix)
+        b2.pack(fill=tk.X, padx=40, pady=6)
+
+        b3 = tk.Button(dlg, text="⚡ Launch Both (Workstation + Matrix)", font=("Consolas", 10, "bold"), fg="#ffffff", bg="#10b981", bd=0, padx=16, pady=8, command=launch_both)
+        b3.pack(fill=tk.X, padx=40, pady=6)
+
     def _launch_admin_cloud(self):
         app_dir = os.path.dirname(os.path.abspath(__file__))
         target = os.path.join(app_dir, "orbital_admin_cloud_gui.py")
@@ -390,7 +424,7 @@ class OrbitalAuthApp:
         pyw = sys.executable.replace("python.exe", "pythonw.exe")
         if os.path.exists(pyw):
             cmd[0] = pyw
-        subprocess.Popen(cmd, creationflags=creationflags)
+        subprocess.Popen(cmd, creationflags=creationflags, cwd=r"C:\Orbital")
 
 if __name__ == "__main__":
     root = tk.Tk()
