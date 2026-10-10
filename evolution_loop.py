@@ -11,7 +11,12 @@ def verify_codebase_integrity():
     broken_files = []
     audited_count = 0
 
-    scan_dirs = [os.path.join(base_dir, "core"), os.path.join(base_dir, "gui"), base_dir]
+    scan_dirs = [
+        os.path.join(base_dir, "core"),
+        os.path.join(base_dir, "gui"),
+        os.path.join(base_dir, "skills"),
+        base_dir
+    ]
     for d in scan_dirs:
         if not os.path.exists(d):
             continue
@@ -20,7 +25,7 @@ def verify_codebase_integrity():
                 fpath = os.path.join(d, item)
                 audited_count += 1
                 try:
-                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                    with open(fpath, "r", encoding="utf-8-sig", errors="ignore") as f:
                         code = f.read()
                     ast.parse(code)
                 except SyntaxError as e:
