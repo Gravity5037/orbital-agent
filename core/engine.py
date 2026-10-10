@@ -15,13 +15,26 @@ except ImportError:
         return {"status": "simulated", "prompt": prompt}
 
 def process_chat(user_input, mode="text"):
-    if mode == "visual" or user_input.startswith("/draw") or user_input.startswith("/generate"):
-        prompt = user_input.replace("/draw", "").replace("/generate", "").strip()
+    stripped = user_input.strip()
+    if mode == "visual" or stripped.startswith("/draw") or stripped.startswith("/generate"):
+        prompt = stripped.replace("/draw", "").replace("/generate", "").strip()
+        res = generate_visual(prompt)
+        res_path = res.get('path', res) if isinstance(res, dict) else str(res)
+        return f"[Nebula Creative Engine Renders]: {res_path}"
+    elif stripped.lower().startswith("draw "):
+        prompt = stripped[5:].strip()
         res = generate_visual(prompt)
         res_path = res.get('path', res) if isinstance(res, dict) else str(res)
         return f"[Nebula Creative Engine Renders]: {res_path}"
     else:
         return query_nucleus(user_input)
+
+class Engine:
+    def __init__(self):
+        pass
+
+    def route_query(self, prompt, mode="text"):
+        return process_chat(prompt, mode=mode)
 
 if __name__ == "__main__":
     print(process_chat("System status query"))

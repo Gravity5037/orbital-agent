@@ -1,6 +1,16 @@
 import os
+import sys
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+sys.path.append(r"C:\Orbital\core")
+try:
+    from core.engine import Engine, process_chat
+except ImportError:
+    try:
+        from engine import Engine, process_chat
+    except Exception:
+        pass
 
 class NucleusHandler(BaseHTTPRequestHandler):
     def do_GET(self):

@@ -1,8 +1,12 @@
-target/ 
+target/
 __pycache__/
 build/
 *.log
-*.specNucleus/*.gguf 
-*.gguf 
+*.gguf
 *.exe
 outputs/
+*.zip
+*.tar.gz
+_archive/
+dist/
+*.tmp

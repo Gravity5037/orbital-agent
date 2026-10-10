@@ -29,6 +29,8 @@ class NebulaEngine:
         img.save(output_path)
         return output_path
 
+    generate = generate_image
+
 _engine = NebulaEngine()
 
 def generate_visual(prompt, output_path=None, is_video=False):

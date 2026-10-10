@@ -1,0 +1,6 @@
+# Orbital OS Master Standalone Dependencies
+pillow>=10.0.0
+numpy>=1.24.0
+opencv-python>=4.8.0
+websockets>=12.0
+psutil>=5.9.0

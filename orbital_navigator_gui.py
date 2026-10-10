@@ -634,16 +634,17 @@ class OrbitalNavigatorWorkstation:
         threading.Thread(target=self._query_ai, args=(val,), daemon=True).start()
 
     def _query_ai(self, prompt):
-        ensure_nucleus_running()
-        payload = json.dumps({"model": MODEL_NAME, "messages": [{"role": "user", "content": prompt}], "stream": False}).encode("utf-8")
-        req = urllib.request.Request(OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                reply = data.get("message", {}).get("content", "Received prompt.")
-                self.root.after(0, lambda: self._append_chat("Orbital", reply))
+            import sys
+            sys.path.append(r"C:\Orbital\core")
+            from core.engine import Engine
+            if not hasattr(self, "_orbital_engine") or self._orbital_engine is None:
+                self.root.after(0, lambda: self._append_chat("System", "⚡ Connecting to Nucleus AI..."))
+                self._orbital_engine = Engine()
+            reply = self._orbital_engine.route_query(prompt)
+            self.root.after(0, lambda: self._append_chat("Orbital", str(reply)))
         except Exception as e:
-            self.root.after(0, lambda: self._append_chat("Orbital Error", f"Nucleus Connection: {e}"))
+            self.root.after(0, lambda: self._append_chat("Orbital Error", f"Engine notice: {e}"))
 
     def _build_presence_tab(self):
         f = self.frames["presence"]
@@ -773,7 +774,22 @@ class OrbitalNavigatorWorkstation:
         gen_btn.pack(anchor="w")
 
     def _gen_img(self):
-        messagebox.showinfo("Image Generator", f"Rendering image for prompt:\n'{self.img_prompt.get()}'")
+        prompt = self.img_prompt.get().strip()
+        if not prompt: return
+        self._append_chat("System", f"🎨 Synthesizing image with Nebula: '{prompt}'...")
+        def run_render():
+            try:
+                import sys
+                sys.path.append(r"C:\Orbital\core")
+                from core.nebula_engine import NebulaEngine
+                nebula = NebulaEngine()
+                out_path = nebula.generate_image(prompt)
+                self.root.after(0, lambda: messagebox.showinfo("Nebula Render Complete", f"Image generated and saved to:\n{out_path}"))
+                self.root.after(0, lambda: self._append_chat("Nebula", f"Image rendered: {out_path}"))
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("Render Error", f"Nebula render fault: {e}"))
+        import threading
+        threading.Thread(target=run_render, daemon=True).start()
 
     def _build_media_tab(self):
         f = self.frames["media"]

@@ -1,28 +1,24 @@
-import http.server, socketserver, json, webbrowser, pathlib, sys, os, subprocess, time
+from pathlib import Path
+import os
 
-if sys.platform == "win32":
-    try:
-        if sys.stdout:
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        if sys.stderr:
-            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+app_file = Path(r"C:\Orbital\run_orbital.py")
+
+code = """import http.server, socketserver, json, webbrowser, pathlib, sys, os
 
 os.chdir(r"C:\Orbital")
 sys.path.append(r"C:\Orbital\core")
 
 engine = None
 try:
-    from core.engine import Engine
+    from engine import Engine
     engine = Engine()
-    print("[OK] Orbital AI Engine (Nucleus & Nebula) Loaded.")
+    print("[?] Orbital AI Engine (Nucleus & Nebula) Loaded.")
 except Exception as e:
     print(f"[!] AI Engine Notice: {e}")
 
 PORT = 8000
 
-UNIVERSAL_UI = """<!DOCTYPE html>
+UNIVERSAL_UI = \"\"\"<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -252,16 +248,15 @@ main {
 
 <header>
   <div class="brand">
-    <div style="font-size:22px;">🛸</div>
+    <div style="font-size:22px;">??</div>
     <div>
       <h1>ORBITAL OS</h1>
       <span>UNIVERSAL WORKSTATION</span>
     </div>
   </div>
   <div class="status-pills">
-    <button onclick="launchDesktop()" class="pill pill-active" style="cursor:pointer; background:rgba(0,240,255,0.18); border:1px solid #00F0FF; color:#00F0FF;">🖥️ LAUNCH DESKTOP HUD</button>
-    <div class="pill pill-active">⚡ POLE 2</div>
-    <div class="pill pill-node">📱 NOTE 8 MESH</div>
+    <div class="pill pill-active">? POLE 2</div>
+    <div class="pill pill-node">?? NOTE 8 MESH</div>
     <div class="pill">SIMD: 512-BIT</div>
   </div>
 </header>
@@ -435,58 +430,13 @@ async function sendMsg() {
     logs.scrollTop = logs.scrollHeight;
   }
 }
-
-async function launchDesktop() {
-  try {
-    const r = await fetch('/api/launch_desktop');
-    const d = await r.json();
-    const logs = document.getElementById('logs');
-    const a = document.createElement('div');
-    a.className = 'msg msg-ai';
-    a.innerHTML = '<strong>[System]</strong> Native Orbital Navigator Desktop HUD launched!';
-    logs.appendChild(a);
-    logs.scrollTop = logs.scrollHeight;
-  } catch(e) {
-    alert('Failed to launch Desktop HUD: ' + e);
-  }
-}
 </script>
 </body>
 </html>
-"""
+\"\"\"
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
-        if self.path.startswith("/outputs/"):
-            clean_rel = self.path.lstrip("/").replace("/", os.sep)
-            img_path = pathlib.Path(r"C:\Orbital") / clean_rel
-            # strip query string if any
-            clean_str = str(img_path).split("?")[0]
-            img_file = pathlib.Path(clean_str)
-            if img_file.exists() and img_file.is_file():
-                self.send_response(200)
-                self.send_header("Content-type", "image/png")
-                self.end_headers()
-                self.wfile.write(img_file.read_bytes())
-                return
-
-        elif self.path == "/api/launch_desktop":
-            pyw = sys.executable.replace("python.exe", "pythonw.exe")
-            target = r"C:\Orbital\orbital_navigator_gui.py"
-            subprocess.Popen([pyw, target], cwd=r"C:\Orbital")
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "launched"}).encode("utf-8"))
-            return
-
-        elif self.path == "/api/status":
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "13/13 Online", "core": "Nucleus & Nebula"}).encode("utf-8"))
-            return
-
         self.send_response(200)
         self.send_header("Content-type", "text/html; charset=utf-8")
         self.end_headers()
@@ -504,44 +454,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     reply = f"[Engine Fault] {ex}"
             else:
                 reply = f"[Nucleus AI Core Active] Processed: {prompt}"
-            
-            reply_str = str(reply)
-            if "outputs\\nebula_render.png" in reply_str or "outputs/nebula_render.png" in reply_str:
-                reply_str += f'<br><img src="/outputs/nebula_render.png?t={int(time.time())}" style="max-width:100%; border-radius:12px; margin-top:10px; border:1px solid #00F0FF; box-shadow:0 0 20px rgba(0,240,255,0.3);">'
-
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps({"reply": reply_str}).encode("utf-8"))
-            return
+            self.wfile.write(json.dumps({"reply": str(reply)}).encode())
 
-PORT = 8000
+print(f"[*] Booting Universal Orbital Workstation on http://0.0.0.0:{PORT}...")
+webbrowser.open(f"http://localhost:{PORT}")
 socketserver.TCPServer.allow_reuse_address = True
-httpd = None
-
-for p in [8000, 8080, 8888]:
-    try:
-        httpd = socketserver.TCPServer(("", p), Handler)
-        PORT = p
-        break
-    except OSError:
-        continue
-
-if not httpd:
-    print("[!] Error: Ports 8000, 8080, and 8888 are all currently in use.")
-    sys.exit(1)
-
-print(f"[*] Booting Universal Orbital Workstation on http://localhost:{PORT}...")
-try:
-    webbrowser.open(f"http://localhost:{PORT}")
-except Exception:
-    pass
-
-print(f"[OK] ORBITAL OS UNIVERSAL WORKSTATION LIVE AT http://localhost:{PORT}")
-print("[*] Accessible from Laptop and Local Network devices.")
-print("[*] Serving GUI + Live AI Engines. Press Ctrl+C in this terminal to stop.")
-try:
+with socketserver.TCPServer(("", PORT), Handler) as httpd:
+    print(f"[?] ORBITAL OS UNIVERSAL WORKSTATION LIVE AT http://10.0.0.56:{PORT}")
+    print("[*] Accessible from Laptop, Note 8, and Chromebook!")
     httpd.serve_forever()
-except KeyboardInterrupt:
-    print("\n[*] Shutting down Orbital server...")
-    httpd.server_close()
+"""
+
+app_file.write_text(code, encoding="utf-8")
+print("[?] Successfully deployed Universal Clean UI into C:\\Orbital\\run_orbital.py!")
