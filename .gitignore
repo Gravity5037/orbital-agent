@@ -1,0 +1,17 @@
+﻿# Model weights & binary caches
+models/*.gguf
+*.bin
+*.pth
+*.safetensors
+
+# Python environment & cache
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+
+# Session & log files
+*.log
+memory/chat_memory.json
+OOSTATE.BIN
