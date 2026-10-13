@@ -1,0 +1,14 @@
+# Orbital core dependencies.
+# The old tree had no manifest at all, yet core/adaptation_engine.py
+# generated a deploy script that ran `pip install -r requirements.txt || true`.
+# This is that file.
+
+psutil>=5.9          # real CPU/RAM/disk telemetry
+websockets>=12.0     # GibberLink peer mesh
+
+# Optional integrations. Each degrades gracefully when absent.
+# opencv-python>=4.8   # camera capture (core/camera.py)
+# Pillow>=10.0         # real image statistics in the eval harness
+# requests>=2.31       # only needed by the legacy self-healing-loop.py
+
+# Hue and Spotify need nothing extra — both are stdlib-only.

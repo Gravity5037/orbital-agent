@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orbital — Radial Menu</title>
+<style>
+  :root {
+    --bg: #0B0E14;
+    --cyan: #00E5FF;
+    --text: #E2E8F0;
+    --muted: #64748B;
+    --card: #121824;
+    --line: rgba(0,229,255,0.18);
+
+    /* Geometry. 64px radius, matching the original 16-unit Tailwind offset. */
+    --radius: 64px;
+    --item: 48px;
+    --toggle: 51px;
+    --duration: 500ms;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font: 14px/1.55 "Consolas", "SF Mono", Menlo, monospace;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 32px;
+  }
+
+  .caption { color: var(--muted); font-size: 12px; letter-spacing: 1px; }
+
+  /* ---------------------------------------------------------------
+     The radial menu.
+
+     Structure: a relatively-positioned wrapper holds an offscreen
+     checkbox, the toggle label, and the items. Everything is absolutely
+     positioned and centred, then translated outward when checked.
+
+     No JavaScript. The checkbox is the state, and `~` in the sibling
+     combinator does the rest.
+     --------------------------------------------------------------- */
+  .radial {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--radius) * 2 + var(--item));
+    height: calc(var(--radius) * 2 + var(--item));
+  }
+
+  .radial__input {
+    position: absolute;
+    opacity: 0;
+    width: 0; height: 0;
+    pointer-events: none;
+  }
+
+  /* --- toggle --- */
+  .radial__toggle {
+    position: absolute;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--toggle);
+    height: var(--toggle);
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: #0F141E;
+    color: var(--cyan);
+    cursor: pointer;
+    transition: transform var(--duration) var(--ease),
+                background var(--duration) var(--ease),
+                border-color var(--duration) var(--ease);
+  }
+
+  .radial__toggle:hover { border-color: var(--cyan); }
+
+  .radial__input:checked ~ .radial__toggle {
+    transform: rotate(45deg);
+    background: #F87171;
+    border-color: #F87171;
+    color: #0B0E14;
+  }
+
+  .radial__input:focus-visible ~ .radial__toggle {
+    outline: 2px solid var(--cyan);
+    outline-offset: 3px;
+  }
+
+  /* --- items --- */
+  .radial__item {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--item);
+    height: var(--item);
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: rgba(18, 24, 36, 0.92);
+    color: var(--text);
+    cursor: pointer;
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+    transition: transform var(--duration) var(--ease),
+                opacity var(--duration) var(--ease),
+                background 200ms var(--ease),
+                border-color 200ms var(--ease);
+    pointer-events: none;
+  }
+
+  .radial__item:hover {
+    background: rgba(0, 229, 255, 0.14);
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  /* Each item has its own outward vector and delay, set inline as
+     --dx / --dy / --delay. Keeps the CSS generic and the markup declarative. */
+  .radial__input:checked ~ .radial__items .radial__item {
+    opacity: 1;
+    transform: translate(
+        calc(var(--dx) * var(--radius)),
+        calc(var(--dy) * var(--radius))
+      ) scale(1);
+    pointer-events: auto;
+    transition-delay: var(--delay);
+  }
+
+  /* Collapse on the way out in reverse order, which reads better than all
+     at once. The toggle has no delay so it responds immediately. */
+  .radial__input:not(:checked) ~ .radial__items .radial__item {
+    transition-delay: calc(var(--delay) * 0.4);
+  }
+
+  .radial__items { position: absolute; inset: 0; display: flex;
+                   align-items: center; justify-content: center; }
+
+  .radial__icon { width: 20px; height: 20px; fill: currentColor; }
+
+  /* A tooltip per item, for when the icon alone is ambiguous. */
+  .radial__item::after {
+    content: attr(data-label);
+    position: absolute;
+    top: calc(100% + 6px);
+    white-space: nowrap;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity 150ms var(--ease);
+    pointer-events: none;
+  }
+  .radial__item:hover::after { opacity: 1; }
+
+  /* Log of what was pressed, so the demo is verifiable. */
+  .log {
+    width: 340px; min-height: 84px; padding: 12px 14px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    font-size: 12px; color: var(--muted);
+  }
+  .log b { color: var(--cyan); font-weight: normal; }
+</style>
+</head>
+<body>
+
+<div class="radial">
+  <input class="radial__input" type="checkbox" id="radial-toggle" />
+
+  <label class="radial__toggle" for="radial-toggle" title="Menu">
+    <!-- plus sign; rotates to an X when open -->
+    <svg class="radial__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2z" fill-rule="evenodd"/>
+    </svg>
+  </label>
+
+  <div class="radial__items">
+    <!--
+      Angles run counter-clockwise from up-left, matching the original.
+      --dx / --dy are unit vectors; the radius multiplies them.
+    -->
+    <button class="radial__item" data-action="moon" data-label="Sleep"
+            style="--dx:-1; --dy: 1; --delay:   0ms" title="Sleep">
+      <svg class="radial__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+    </button>
+
+    <button class="radial__item" data-action="chat" data-label="Chat"
+            style="--dx:-1; --dy: 0; --delay:  75ms" title="Chat">
+      <svg class="radial__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 4h16v12H8l-4 4z" fill-rule="evenodd"/>
+      </svg>
+    </button>
+
+    <button class="radial__item" data-action="camera" data-label="Camera"
+            style="--dx:-1; --dy:-1; --delay: 100ms" title="Camera">
+      <svg class="radial__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 4l-1.5 2H4v14h16V6h-3.5L15 4zM12 8a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"
+              fill-rule="evenodd"/>
+      </svg>
+    </button>
+
+    <button class="radial__item" data-action="clock" data-label="History"
+            style="--dx: 0; --dy:-1; --delay: 125ms" title="History">
+      <svg class="radial__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 5v5.6l4 2.4-1 1.7-5-3V7z"
+              fill-rule="evenodd"/>
+      </svg>
+    </button>
+
+    <button class="radial__item" data-action="jobs" data-label="Jobs"
+            style="--dx: 1; --dy:-1; --delay: 150ms" title="Jobs">
+      <svg class="radial__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 4h6v2h5v14H4V6h5zm2 0v2h2V4zM6 8v10h12V8z" fill-rule="evenodd"/>
+      </svg>
+    </button>
+
+    <button class="radial__item" data-action="mesh" data-label="Mesh"
+            style="--dx: 1; --dy: 0; --delay: 175ms" title="Mesh">
+      <svg class="radial__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4l4 3-4 3-4-3z"/>
+      </svg>
+    </button>
+
+    <button class="radial__item" data-action="settings" data-label="Settings"
+            style="--dx: 1; --dy: 1; --delay: 200ms" title="Settings">
+      <svg class="radial__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4l-2 1 .3 2.2-1.9 1.9-2.2-.3-1 2h-2.4l-1-2-2.2.3-1.9-1.9.3-2.2-2-1v-2.4l2-1-.3-2.2 1.9-1.9 2.2.3 1-2h2.4l1 2 2.2-.3 1.9 1.9-.3 2.2 2 1z"
+              fill-rule="evenodd"/>
+      </svg>
+    </button>
+
+    <button class="radial__item" data-action="images" data-label="Gallery"
+            style="--dx: 0; --dy: 1; --delay: 225ms" title="Gallery">
+      <svg class="radial__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 4h18v16H3zm2 2v9l4-4 3 3 3-4 4 5V6z" fill-rule="evenodd"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="caption">Click the plus. No JavaScript — pure CSS <code>peer-checked</code>.</div>
+<div class="log" id="log">Ready.</div>
+
+<script>
+  // The menu itself is CSS-only. This listener exists so the demo can show
+  // which action fired, and to close the menu after a choice.
+  const toggle = document.getElementById("radial-toggle");
+  const log = document.getElementById("log");
+
+  document.querySelectorAll(".radial__item").forEach((item) => {
+    item.addEventListener("click", () => {
+      const action = item.dataset.action;
+      const label = item.dataset.label;
+      log.innerHTML = `<b>${label}</b> — action: <b>${action}</b>`;
+      toggle.checked = false;
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orbital — Ring Button</title>
+<style>
+  :root {
+    --bg: #0B0E14;
+    --cyan: #00E5FF;
+    --text: #E2E8F0;
+    --muted: #64748B;
+    --line: rgba(0,229,255,0.18);
+
+    --btn-w: 170px;
+    --btn-h: 60px;
+    --radius: 50px;
+    --speed: 400ms;
+
+    /* The four ring colours, outside in. */
+    --ring-1: #ef476f;   /* pink   */
+    --ring-2: #ffd166;   /* yellow */
+    --ring-3: #06d6a0;   /* green  */
+    --ring-4: #118ab2;   /* blue   */
+    --ring-fill: #073b4c;
+
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 36px;
+  }
+
+  .caption { color: var(--muted); font-size: 12px; letter-spacing: 1px; }
+  .row { display: flex; gap: 24px; align-items: center; flex-wrap: wrap;
+         justify-content: center; max-width: 640px; }
+
+  /* ==============================================================
+     Ring button.
+
+     Four inset box-shadows with increasing spread. Each is painted
+     beneath the one before it, so the visible result is four concentric
+     bands, 4px each, running outward-in:
+
+         pink | yellow | green | blue | fill
+
+     The centre keeps the background colour, which is why the label
+     stays readable: the rings eat 16px on each side, leaving 28px of
+     clear height in a 60px button.
+     ============================================================== */
+  .ring-btn {
+    position: relative;
+    width: var(--btn-w);
+    height: var(--btn-h);
+    font: 600 18px/1 "Segoe UI", system-ui, sans-serif;
+    background: #fff;
+    color: #000;
+    border: none;
+    border-radius: var(--radius);
+    outline: none;
+    cursor: pointer;
+    transition: box-shadow var(--speed) var(--ease),
+                background-color var(--speed) var(--ease),
+                color var(--speed) var(--ease);
+  }
+
+  .ring-btn:hover,
+  .ring-btn:focus-visible {
+    box-shadow:
+      inset 0 0 0 4px  var(--ring-1),
+      inset 0 0 0 8px  var(--ring-2),
+      inset 0 0 0 12px var(--ring-3),
+      inset 0 0 0 16px var(--ring-4);
+    background: var(--ring-fill);
+    color: #fff;
+  }
+
+  .ring-btn:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 4px;
+  }
+
+  .ring-btn:active {
+    transform: scale(0.98);
+  }
+
+  /* --- the label ---
+     Centred with flex so it stays put as the rings animate. The rings
+     are painted on the button, not on the text, so the text never
+     shifts — but a wrapping label would, so line-height is fixed. */
+  .ring-btn__label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 10px;
+  }
+
+  .ring-btn__icon {
+    width: 20px; height: 20px;
+    flex-shrink: 0;
+    fill: currentColor;
+  }
+
+  /* --- sizes ---
+     The ring widths are fixed at 4/8/12/16px. On a smaller button that
+     would swallow the centre, so the small variant uses thinner rings
+     and the large one thicker. */
+  .ring-btn--sm {
+    --btn-w: 120px;
+    --btn-h: 44px;
+    font-size: 14px;
+  }
+  .ring-btn--sm:hover,
+  .ring-btn--sm:focus-visible {
+    box-shadow:
+      inset 0 0 0 3px  var(--ring-1),
+      inset 0 0 0 6px  var(--ring-2),
+      inset 0 0 0 9px  var(--ring-3),
+      inset 0 0 0 12px var(--ring-4);
+  }
+
+  .ring-btn--lg {
+    --btn-w: 240px;
+    --btn-h: 76px;
+    font-size: 20px;
+  }
+  .ring-btn--lg:hover,
+  .ring-btn--lg:focus-visible {
+    box-shadow:
+      inset 0 0 0 5px  var(--ring-1),
+      inset 0 0 0 10px var(--ring-2),
+      inset 0 0 0 15px var(--ring-3),
+      inset 0 0 0 20px var(--ring-4);
+  }
+
+  /* --- animated entry ---
+     A staggered reveal, each ring arriving after the last. Only on
+     hover, and only when motion is welcome. */
+  @media (prefers-reduced-motion: no-preference) {
+    .ring-btn--stagger:hover,
+    .ring-btn--stagger:focus-visible {
+      animation: ring-in 400ms var(--ease) both;
+    }
+    @keyframes ring-in {
+      0% {
+        box-shadow:
+          inset 0 0 0 0 var(--ring-1),
+          inset 0 0 0 0 var(--ring-2),
+          inset 0 0 0 0 var(--ring-3),
+          inset 0 0 0 0 var(--ring-4);
+      }
+      100% {
+        box-shadow:
+          inset 0 0 0 4px  var(--ring-1),
+          inset 0 0 0 8px  var(--ring-2),
+          inset 0 0 0 12px var(--ring-3),
+          inset 0 0 0 16px var(--ring-4);
+      }
+    }
+  }
+
+  /* --- disabled --- */
+  .ring-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .ring-btn:disabled:hover {
+    box-shadow: none;
+    background: #fff;
+    color: #000;
+    transform: none;
+  }
+
+  .log {
+    width: 420px; min-height: 60px; padding: 12px 14px;
+    background: #121824; border: 1px solid var(--line); border-radius: 8px;
+    font: 12px/1.7 "Consolas", monospace; color: var(--muted);
+  }
+  .log b { color: var(--cyan); font-weight: normal; }
+</style>
+</head>
+<body>
+
+<div class="row">
+  <button class="ring-btn" id="b1">
+    <span class="ring-btn__label">Hover me</span>
+  </button>
+
+  <button class="ring-btn ring-btn--stagger" id="b2">
+    <span class="ring-btn__label">
+      <svg class="ring-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8 5v14l11-7z" fill-rule="evenodd"/>
+      </svg>
+      Staggered
+    </span>
+  </button>
+</div>
+
+<div class="row">
+  <button class="ring-btn ring-btn--sm" id="b3">
+    <span class="ring-btn__label">Small</span>
+  </button>
+
+  <button class="ring-btn ring-btn--lg" id="b4">
+    <span class="ring-btn__label">Large</span>
+  </button>
+
+  <button class="ring-btn" id="b5" disabled>
+    <span class="ring-btn__label">Disabled</span>
+  </button>
+</div>
+
+<div class="caption">
+  Tab through them — focus shows the same rings as hover.
+</div>
+<div class="log" id="log">Ready.</div>
+
+<script>
+  // No animation logic here; the rings are pure CSS. This only reports
+  // which button fired.
+  const log = document.getElementById("log");
+  document.querySelectorAll(".ring-btn:not(:disabled)").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const label = btn.textContent.trim();
+      log.innerHTML = `<b>${label}</b> — clicked.`;
+    });
+  });
+</script>
+
+</body>
+</html>

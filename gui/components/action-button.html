@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orbital — Delete Button</title>
+<style>
+  :root {
+    --bg: #0B0E14;
+    --cyan: #00E5FF;
+    --text: #E2E8F0;
+    --muted: #64748B;
+    --line: rgba(0,229,255,0.18);
+
+    /* Button geometry, from the original. */
+    --size: 50px;
+    --expanded: 140px;
+    --radius: 50px;
+    --btn-bg: rgb(20, 20, 20);
+    --btn-danger: rgb(255, 69, 69);
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --speed: 300ms;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 40px;
+  }
+
+  .caption { color: var(--muted); font-size: 12px; letter-spacing: 1px; }
+  .row { display: flex; gap: 28px; align-items: center; }
+
+  /* ==============================================================
+     Hover-expand action button.
+
+     Collapsed: a 50px circle holding a 12px icon.
+     Hover:     a 140px pill. The icon grows and slides down out of
+                the clipped area; the label rises into view from the
+                clipped top edge.
+
+     The clipping is what makes it work. `overflow: hidden` plus the
+     label starting at top: -20px means the text is above the button
+     and invisible until translateY brings it down into the box.
+     ============================================================== */
+  .action {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--size);
+    height: var(--size);
+    border: none;
+    border-radius: 50%;
+    background-color: var(--btn-bg);
+    font-weight: 600;
+    font-size: 13px;
+    color: #fff;
+    cursor: pointer;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.164);
+    transition: width var(--speed) var(--ease),
+                border-radius var(--speed) var(--ease),
+                background-color var(--speed) var(--ease);
+  }
+
+  .action:hover,
+  .action:focus-visible {
+    width: var(--expanded);
+    border-radius: var(--radius);
+    background-color: var(--btn-danger);
+  }
+
+  /* Focus should look like hover, but not depend on the mouse. */
+  .action:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+  /* --- icon --- */
+  .action__icon {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    transition: width var(--speed) var(--ease),
+                height var(--speed) var(--ease),
+                transform var(--speed) var(--ease);
+  }
+
+  .action__icon path { fill: #fff; }
+
+  .action:hover .action__icon,
+  .action:focus-visible .action__icon {
+    width: 50px;
+    height: 50px;
+    transform: translateY(60%);
+  }
+
+  /* --- label ---
+     Starts above the button and clipped. On hover it slides down into
+     the visible area while its font-size grows.
+
+     The original animated font-size, which forces a text reflow every
+     frame. Scaling with transform is smoother, but scaling text distorts
+     it, so this keeps font-size fixed and animates position only. Same
+     visual result, no layout thrash. */
+  .action__label {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    margin-top: -9px;              /* half the 18px line box */
+    text-align: center;
+    font-size: 13px;
+    line-height: 18px;
+    color: #fff;
+    opacity: 0;
+    transform: translateY(-26px);
+    transition: transform var(--speed) var(--ease),
+                opacity var(--speed) var(--ease);
+    pointer-events: none;
+  }
+
+  .action:hover .action__label,
+  .action:focus-visible .action__label {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* --- variants ---
+     The original hard-coded red. A modifier class means one component
+     covers delete, archive and anything else. */
+  .action--danger:hover,
+  .action--danger:focus-visible { background-color: var(--btn-danger); }
+
+  .action--warn:hover,
+  .action--warn:focus-visible { background-color: #FBBF24; color: #18181b; }
+  .action--warn:hover .action__label { color: #18181b; }
+  .action--warn:hover .action__icon path { fill: #18181b; }
+
+  .action--safe:hover,
+  .action--safe:focus-visible { background-color: #34D399; color: #18181b; }
+  .action--safe:hover .action__label { color: #18181b; }
+  .action--safe:hover .action__icon path { fill: #18181b; }
+
+  /* --- disabled --- */
+  .action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .action:disabled:hover {
+    width: var(--size);
+    border-radius: 50%;
+    background-color: var(--btn-bg);
+  }
+  .action:disabled:hover .action__icon {
+    width: 12px; height: 12px; transform: none;
+  }
+  .action:disabled:hover .action__label { opacity: 0; }
+
+  /* --- confirmation state ---
+     For destructive actions, a two-step confirm is worth having. The
+     button switches to this class after the first click. */
+  .action--confirm {
+    width: var(--expanded);
+    border-radius: var(--radius);
+    background-color: #FBBF24;
+    color: #18181b;
+  }
+  .action--confirm .action__label { opacity: 1; transform: translateY(0); color: #18181b; }
+  .action--confirm .action__icon { width: 50px; height: 50px; transform: translateY(60%); }
+  .action--confirm .action__icon path { fill: #18181b; }
+
+  /* Reduced motion: keep the state change, drop the animation. */
+  @media (prefers-reduced-motion: reduce) {
+    .action, .action__icon, .action__label {
+      transition-duration: 1ms;
+    }
+  }
+
+  .log {
+    width: 380px; min-height: 76px; padding: 12px 14px;
+    background: #121824; border: 1px solid var(--line); border-radius: 8px;
+    font: 12px/1.7 "Consolas", monospace; color: var(--muted);
+  }
+  .log b { color: var(--cyan); font-weight: normal; }
+</style>
+</head>
+<body>
+
+<div class="row">
+  <button class="action action--danger" id="delete" aria-label="Delete">
+    <svg class="action__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 3h6l1 2h4v2H4V5h4zM6 9h12l-1 12H7z" fill-rule="evenodd"/>
+    </svg>
+    <span class="action__label">Delete</span>
+  </button>
+
+  <button class="action action--warn" id="archive" aria-label="Archive">
+    <svg class="action__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 4h18v4H3zm1 6h16v10H4zm5 3v2h6v-2z" fill-rule="evenodd"/>
+    </svg>
+    <span class="action__label">Archive</span>
+  </button>
+
+  <button class="action action--safe" id="keep" aria-label="Keep">
+    <svg class="action__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" fill-rule="evenodd"/>
+    </svg>
+    <span class="action__label">Keep</span>
+  </button>
+
+  <button class="action action--danger" id="disabled" disabled aria-label="Disabled">
+    <svg class="action__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 3h6l1 2h4v2H4V5h4zM6 9h12l-1 12H7z" fill-rule="evenodd"/>
+    </svg>
+    <span class="action__label">Disabled</span>
+  </button>
+</div>
+
+<div class="caption">Hover to expand. Tab also works — the label is keyboard-reachable.</div>
+<div class="log" id="log">Ready.</div>
+
+<script>
+  // The animation is CSS-only. This exists to demonstrate the two-step
+  // confirm pattern, which is what you actually want on a destructive action.
+  const log = document.getElementById("log");
+  let pending = null;
+  let timer = null;
+
+  function say(html) { log.innerHTML = html; }
+
+  document.getElementById("delete").addEventListener("click", (ev) => {
+    const btn = ev.currentTarget;
+
+    if (!btn.classList.contains("action--confirm")) {
+      btn.classList.add("action--confirm");
+      btn.querySelector(".action__label").textContent = "Sure?";
+      say("<b>Delete</b> — click again to confirm. Times out in 3s.");
+      pending = btn;
+      timer = setTimeout(() => reset(), 3000);
+      return;
+    }
+
+    clearTimeout(timer);
+    say("<b>Delete</b> — confirmed. (No file was actually deleted.)");
+    reset();
+  });
+
+  function reset() {
+    if (!pending) return;
+    pending.classList.remove("action--confirm");
+    pending.querySelector(".action__label").textContent = "Delete";
+    pending = null;
+  }
+
+  document.getElementById("archive").addEventListener("click", () =>
+    say("<b>Archive</b> — action fired."));
+
+  document.getElementById("keep").addEventListener("click", () =>
+    say("<b>Keep</b> — action fired."));
+</script>
+
+</body>
+</html>

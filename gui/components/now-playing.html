@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orbital — Now Playing</title>
+<style>
+  :root {
+    --bg: #0B0E14;
+    --cyan: #00E5FF;
+    --text: #E2E8F0;
+    --muted: #64748B;
+    --line: rgba(0,229,255,0.18);
+
+    /* Collapsed and expanded card sizes, from the Tailwind original:
+       w-40 h-20  ->  160x80
+       w-72 h-40  ->  288x160  */
+    --w-collapsed: 160px;
+    --w-expanded: 288px;
+    --h-collapsed: 80px;
+    --h-expanded: 160px;
+
+    --vinyl: 128px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 28px;
+  }
+
+  .caption { color: var(--muted); font-size: 12px; letter-spacing: 1px; }
+
+  /* ==============================================================
+     The player. One hover target: .player:hover drives everything.
+     No JavaScript for the layout or animation.
+     ============================================================== */
+  .player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+    position: relative;
+  }
+
+  /* --- vinyl, above the card --- */
+  .player__vinyl-wrap {
+    position: relative;
+    z-index: 0;
+    height: 64px;          /* h-16 */
+    margin-bottom: -8px;   /* -mb-2 */
+    transition: height 200ms var(--ease);
+    overflow: hidden;
+  }
+
+  .player:hover .player__vinyl-wrap { height: 0; }
+
+  .player__vinyl {
+    width: var(--vinyl);
+    height: var(--vinyl);
+    border: 4px solid #a1a1aa;     /* zinc-400 */
+    border-radius: 50%;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    animation: spin 3s linear infinite;
+    transition: all 500ms var(--ease);
+    display: block;
+    background: #000;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* The centre spindle, absolutely placed over the record. */
+  .player__spindle {
+    position: absolute;
+    z-index: 10;
+    width: 32px; height: 32px;     /* w-8 h-8 */
+    background: #fff;
+    border: 4px solid #a1a1aa;
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    top: 48px; left: 48px;         /* top-12 left-12 */
+  }
+
+  /* --- the card --- */
+  .player__card {
+    position: relative;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    width: var(--w-collapsed);
+    height: var(--h-collapsed);
+    background: #fff;
+    color: #18181b;
+    border-radius: 16px;           /* rounded-2xl */
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    transition: all 300ms var(--ease);
+    overflow: hidden;
+  }
+
+  .player:hover .player__card {
+    width: var(--w-expanded);
+    height: var(--h-expanded);
+  }
+
+  /* --- row that holds artwork + text --- */
+  .player__row {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 0;
+    transition: height 300ms var(--ease);
+  }
+
+  .player:hover .player__row { height: 80px; }
+
+  /* --- mini artwork, revealed on hover --- */
+  .player__art {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 96px; height: 96px;
+    opacity: 0;
+    transition: all 100ms var(--ease);
+    flex-shrink: 0;
+  }
+
+  .player:hover .player__art {
+    opacity: 1;
+    animation: spin 3s linear infinite;
+  }
+
+  .player__art svg {
+    width: 96px; height: 96px;
+    border: 4px solid #a1a1aa;
+    border-radius: 50%;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    display: block;
+    background: #000;
+  }
+
+  .player__art-dot {
+    position: absolute;
+    z-index: 10;
+    width: 24px; height: 24px;
+    background: #fff;
+    border: 4px solid #a1a1aa;
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  }
+
+  /* --- track text --- */
+  .player__meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    padding-left: 12px;
+    margin-left: -96px;            /* -ml-24, slides in on hover */
+    overflow: hidden;
+    white-space: nowrap;
+    transition: margin 300ms var(--ease);
+  }
+
+  .player:hover .player__meta { margin-left: -12px; }
+
+  .player__title {
+    font-size: 20px;              /* text-xl */
+    font-weight: 700;
+    margin: 0;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .player__artist {
+    color: #52525b;                /* zinc-600 */
+    margin: 0;
+    font-size: 14px;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* --- progress --- */
+  .player__progress {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin: 12px 12px 0;
+    background: #e0e7ff;           /* indigo-100 */
+    border-radius: 6px;
+    min-height: 16px;
+    transition: margin 300ms var(--ease);
+  }
+
+  .player:hover .player__progress { margin-top: 0; }
+
+  .player__time {
+    display: none;
+    padding: 0 12px;
+    font-size: 12px;
+    color: #52525b;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .player:hover .player__time { display: inline-block; }
+
+  .player__seek {
+    -webkit-appearance: none;
+    appearance: none;
+    flex-grow: 1;
+    width: 96px;
+    height: 4px;
+    margin: 0 8px;
+    background: #d4d4d8;
+    border-radius: 999px;
+    cursor: pointer;
+    outline: none;
+    transition: width 300ms var(--ease);
+  }
+
+  .player:hover .player__seek { width: 100%; }
+
+  .player__seek::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px; height: 12px;
+    background: #fff;
+    border: 2px solid #a1a1aa;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    cursor: pointer;
+  }
+
+  .player__seek::-moz-range-thumb {
+    width: 12px; height: 12px;
+    background: #fff;
+    border: 2px solid #a1a1aa;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  /* --- controls --- */
+  .player__controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    margin: 0 12px;
+    gap: 20px;                     /* space-x-5 */
+  }
+
+  .player__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 0;
+    height: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: #18181b;
+    transition: width 300ms var(--ease), opacity 300ms var(--ease);
+    opacity: 0;
+    overflow: hidden;
+  }
+
+  .player:hover .player__btn { width: 48px; opacity: 1; }
+
+  /* The play/pause button is always visible, even collapsed. */
+  .player__btn--main {
+    width: 48px;
+    opacity: 1;
+  }
+
+  .player__btn svg { stroke: currentColor; fill: none; flex-shrink: 0; }
+  .player__btn:hover { color: var(--cyan); }
+  .player__btn--muted { color: #777; }
+
+  /* Play/pause swap, driven by a hidden checkbox. */
+  .player__state { display: none; }
+  .player__state:checked ~ .player__btn--main .icon-play { display: none; }
+  .player__state:not(:checked) ~ .player__btn--main .icon-pause { display: none; }
+
+  /* Repeat/shuffle swap. */
+  .player__mode:checked ~ .player__btn--mode .icon-repeat { display: none; }
+  .player__mode:not(:checked) ~ .player__btn--mode .icon-shuffle { display: none; }
+
+  /* Connection indicator. */
+  .player__status {
+    position: absolute;
+    top: 8px; right: 12px;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    z-index: 40;
+  }
+  .player__status.ok { color: #34D399; }
+  .player__status.bad { color: #F87171; }
+
+  .hint {
+    font-size: 12px; color: var(--muted); max-width: 380px;
+    text-align: center; line-height: 1.7;
+  }
+  .hint code { color: var(--cyan); }
+</style>
+</head>
+<body>
+
+<div class="player" id="player">
+  <span class="player__status" id="status">demo</span>
+
+  <!-- vinyl, collapses when the card expands -->
+  <div class="player__vinyl-wrap">
+    <svg class="player__vinyl" viewBox="0 0 128 128" aria-hidden="true">
+      <rect width="128" height="128" fill="black"/>
+      <!-- groove speckle -->
+      <circle cx="20" cy="20" r="2" fill="white"/>
+      <circle cx="40" cy="30" r="2" fill="white"/>
+      <circle cx="60" cy="10" r="2" fill="white"/>
+      <circle cx="80" cy="40" r="2" fill="white"/>
+      <circle cx="100" cy="20" r="2" fill="white"/>
+      <circle cx="120" cy="50" r="2" fill="white"/>
+      <circle cx="90" cy="30" r="10" fill="white" fill-opacity="0.5"/>
+      <circle cx="90" cy="30" r="8" fill="white"/>
+      <!-- label rings -->
+      <path d="M0 128 Q32 64 64 128 T128 128" fill="purple" stroke="black"/>
+      <path d="M0 128 Q32 48 64 128 T128 128" fill="mediumpurple" stroke="black"/>
+      <path d="M0 128 Q32 32 64 128 T128 128" fill="rebeccapurple" stroke="black"/>
+      <path d="M0 128 Q16 64 32 128 T64 128" fill="purple" stroke="black"/>
+      <path d="M64 128 Q80 64 96 128 T128 128" fill="mediumpurple" stroke="black"/>
+    </svg>
+    <div class="player__spindle"></div>
+  </div>
+
+  <div class="player__card">
+    <div class="player__row">
+      <!-- artwork, fades in on hover -->
+      <div class="player__art">
+        <svg viewBox="0 0 128 128" aria-hidden="true">
+          <rect width="128" height="128" fill="black"/>
+          <circle cx="20" cy="20" r="2" fill="white"/>
+          <circle cx="40" cy="30" r="2" fill="white"/>
+          <circle cx="60" cy="10" r="2" fill="white"/>
+          <circle cx="80" cy="40" r="2" fill="white"/>
+          <circle cx="100" cy="20" r="2" fill="white"/>
+          <circle cx="120" cy="50" r="2" fill="white"/>
+          <circle cx="90" cy="30" r="10" fill="white" fill-opacity="0.5"/>
+          <circle cx="90" cy="30" r="8" fill="white"/>
+          <path d="M0 128 Q32 64 64 128 T128 128" fill="purple" stroke="black"/>
+          <path d="M0 128 Q32 48 64 128 T128 128" fill="mediumpurple" stroke="black"/>
+          <path d="M0 128 Q32 32 64 128 T128 128" fill="rebeccapurple" stroke="black"/>
+          <path d="M0 128 Q16 64 32 128 T64 128" fill="purple" stroke="black"/>
+          <path d="M64 128 Q80 64 96 128 T128 128" fill="mediumpurple" stroke="black"/>
+        </svg>
+        <div class="player__art-dot"></div>
+      </div>
+
+      <div class="player__meta">
+        <p class="player__title" id="track">Music Name</p>
+        <p class="player__artist" id="artist">Singer &amp; artist</p>
+      </div>
+    </div>
+
+    <div class="player__progress">
+      <span class="player__time" id="elapsed">0:00</span>
+      <input class="player__seek" type="range" min="0" max="100" value="0"
+             id="seek" aria-label="Seek">
+      <span class="player__time" id="duration">3:45</span>
+    </div>
+
+    <div class="player__controls">
+      <!-- mode toggle: repeat <-> shuffle -->
+      <input class="player__mode" type="checkbox" id="mode" hidden>
+      <button class="player__btn player__btn--mode player__btn--muted"
+              id="btn-mode" title="Repeat / shuffle" aria-label="Repeat or shuffle">
+        <svg class="icon-repeat" width="20" height="20" viewBox="0 0 24 24"
+             stroke="#777" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" fill="none">
+          <polyline points="17 1 21 5 17 9"/>
+          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+          <polyline points="7 23 3 19 7 15"/>
+          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        </svg>
+        <svg class="icon-shuffle" width="20" height="20" viewBox="0 0 24 24"
+             stroke="#777" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" fill="none">
+          <polyline points="16 3 21 3 21 8"/>
+          <line x1="4" y1="20" x2="21" y2="3"/>
+          <polyline points="21 16 21 21 16 21"/>
+          <line x1="15" y1="15" x2="21" y2="21"/>
+          <line x1="4" y1="4" x2="9" y2="9"/>
+        </svg>
+      </button>
+
+      <button class="player__btn" id="btn-prev" title="Previous" aria-label="Previous">
+        <svg width="24" height="24" viewBox="0 0 24 24" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="19 20 9 12 19 4 19 20"/>
+          <line x1="5" y1="19" x2="5" y2="5"/>
+        </svg>
+      </button>
+
+      <!-- play/pause, always visible -->
+      <input class="player__state" type="checkbox" id="state" hidden>
+      <button class="player__btn player__btn--main" id="btn-play"
+              title="Play / pause" aria-label="Play or pause">
+        <svg class="icon-play" width="24" height="24" viewBox="0 0 24 24"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        <svg class="icon-pause" width="24" height="24" viewBox="0 0 24 24"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="4" width="4" height="16"/>
+          <rect x="14" y="4" width="4" height="16"/>
+        </svg>
+      </button>
+
+      <button class="player__btn" id="btn-next" title="Next" aria-label="Next">
+        <svg width="24" height="24" viewBox="0 0 24 24" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 4 15 12 5 20 5 4"/>
+          <line x1="19" y1="5" x2="19" y2="19"/>
+        </svg>
+      </button>
+
+      <button class="player__btn player__btn--muted" id="btn-list"
+              title="Queue" aria-label="Queue">
+        <svg width="20" height="20" viewBox="0 0 24 24" stroke="#777"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6"/>
+          <line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/>
+          <line x1="3" y1="12" x2="3.01" y2="12"/>
+          <line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="hint">
+  Hover the card to expand. <span id="hint-text">Demo mode — showing placeholder data.</span>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Wiring.
+//
+// The layout and animation are pure CSS. This script does two things: point
+// the widget at a real Orbital engine when one is reachable, and fall back to
+// demo data when it is not.
+//
+// The engine requires a token on every route except /api/ping. Paste one below
+// or set it via the URL:  ?token=<your token>
+// ---------------------------------------------------------------------------
+const API = "http://127.0.0.1:5000";
+const params = new URLSearchParams(location.search);
+let TOKEN = params.get("token") || "";
+
+const $ = (id) => document.getElementById(id);
+
+function setStatus(text, cls) {
+  const el = $("status");
+  el.textContent = text;
+  el.className = "player__status" + (cls ? " " + cls : "");
+}
+
+function fmtTime(ms) {
+  if (!ms && ms !== 0) return "0:00";
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = String(total % 60).padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+async function api(path, opts) {
+  const o = opts || {};
+  const headers = Object.assign({ "Content-Type": "application/json" }, o.headers || {});
+  if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
+  const res = await fetch(API + path, Object.assign({}, o, { headers }));
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch (e) { data = { raw: text }; }
+  if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// State. Everything the widget shows comes from here, so demo mode and live
+// mode are the same code path.
+// ---------------------------------------------------------------------------
+let state = {
+  title: "Music Name",
+  artist: "Singer & artist",
+  playing: false,
+  progress: 0,
+  duration: 225000,   // 3:45
+  mode: "repeat",
+  live: false,
+};
+
+function render() {
+  $("track").textContent = state.title;
+  $("artist").textContent = state.artist;
+  $("elapsed").textContent = fmtTime(state.progress);
+  $("duration").textContent = fmtTime(state.duration);
+  $("state").checked = state.playing;
+  $("mode").checked = state.mode === "shuffle";
+
+  const seek = $("seek");
+  seek.max = state.duration || 100;
+  seek.value = state.progress || 0;
+}
+
+// ---------------------------------------------------------------------------
+// Live polling. Only runs when a token is present and the engine answers.
+// ---------------------------------------------------------------------------
+async function refresh() {
+  if (!TOKEN) return;
+  try {
+    const d = await api("/api/integrations");
+    const spot = d.spotify || {};
+    if (!spot.available) {
+      setStatus("spotify off", "bad");
+      $("hint-text").textContent = spot.detail || "Spotify is not authorized.";
+      return;
+    }
+    const np = await api("/api/spotify/now").catch(() => null);
+    if (np && np.name) {
+      state.title = np.name;
+      state.artist = np.artists || "";
+      state.playing = !!np.playing;
+      state.progress = np.progress_ms || 0;
+      state.duration = np.duration_ms || 225000;
+      state.live = true;
+      setStatus("live", "ok");
+      $("hint-text").textContent = "Connected to Spotify.";
+      render();
+    } else {
+      setStatus("idle");
+      $("hint-text").textContent = "Connected, but nothing is playing.";
+    }
+  } catch (e) {
+    setStatus("offline", "bad");
+    $("hint-text").textContent = "Engine not reachable — demo mode.";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Controls. Each tries the real endpoint and falls back to local state, so
+// the widget is usable before Spotify is authorized.
+// ---------------------------------------------------------------------------
+async function command(path, fallback) {
+  if (!state.live) {
+    fallback();
+    render();
+    return;
+  }
+  try {
+    await api(path, { method: "POST", body: "{}" });
+    setTimeout(refresh, 400);
+  } catch (e) {
+    setStatus("error", "bad");
+    $("hint-text").textContent = e.message;
+  }
+}
+
+$("btn-play").addEventListener("click", () => {
+  const wantPlaying = !state.playing;
+  command(wantPlaying ? "/api/spotify/play" : "/api/spotify/pause", () => {
+    state.playing = wantPlaying;
+  });
+});
+
+$("btn-next").addEventListener("click", () =>
+  command("/api/spotify/next", () => { state.progress = 0; }));
+
+$("btn-prev").addEventListener("click", () =>
+  command("/api/spotify/previous", () => { state.progress = 0; }));
+
+$("btn-mode").addEventListener("click", () => {
+  state.mode = state.mode === "repeat" ? "shuffle" : "repeat";
+  command(state.mode === "shuffle" ? "/api/spotify/shuffle" : "/api/spotify/repeat",
+          () => {});
+  render();
+});
+
+$("seek").addEventListener("input", (ev) => {
+  state.progress = Number(ev.target.value);
+  $("elapsed").textContent = fmtTime(state.progress);
+});
+
+$("seek").addEventListener("change", (ev) => {
+  const pos = Number(ev.target.value);
+  command("/api/spotify/seek", () => {}).then?.(() => {});
+  if (state.live) {
+    api("/api/spotify/seek", {
+      method: "POST",
+      body: JSON.stringify({ position_ms: pos }),
+    }).catch(() => {});
+  }
+});
+
+$("btn-list").addEventListener("click", () => {
+  $("hint-text").textContent = "Queue view is not wired yet.";
+});
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+render();
+
+// If a token was supplied, check the engine once and start polling.
+if (TOKEN) {
+  refresh();
+  setInterval(refresh, 5000);
+} else {
+  setStatus("demo");
+  $("hint-text").textContent =
+    "Demo mode. Add ?token=<engine token> to the URL to connect.";
+}
+</script>
+
+</body>
+</html>

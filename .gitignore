@@ -1,0 +1,45 @@
+# --- state and runtime output: never commit these ---
+state/
+logs/
+images/
+videos/
+captures/
+
+# --- secrets ---
+*.token
+engine.token
+accounts.json
+hue.key
+spotify.json
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- models: far too large for git ---
+*.gguf
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+models/
+
+# --- generated reports ---
+state/evals/
+state/datasets/
+state/jobs.json
+
+# --- os cruft ---
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- editors ---
+.vscode/
+.idea/
+*.swp
