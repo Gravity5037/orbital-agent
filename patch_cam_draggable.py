@@ -2,10 +2,8 @@
 with open(p, "r", encoding="utf-8") as f:
     html = f.read()
 
-# Make sure camera button has onclick
 html = html.replace('<div class="nav-item">📷 Camera Feed (Optical)</div>', '<div class="nav-item" onclick="toggleCamera()">📷 Camera Feed (Optical)</div>')
 
-# Replace toggleCamera with draggable/closable version
 draggable_func = """
 async function toggleCamera() {
     let box = document.getElementById("orbital-cam-box");
@@ -23,37 +21,36 @@ async function toggleCamera() {
     box.innerHTML = `
         <div id="orbital-cam-header" style="background:rgba(0,229,255,0.25); color:#00E5FF; font-size:12px; font-weight:bold; padding:8px 12px; display:flex; justify-content:space-between; align-items:center; cursor:move; user-select:none; border-bottom:1px solid rgba(0,229,255,0.3);">
             <span>📷 OPTICAL FEED (DRAG HERE)</span>
-            <span style="cursor:pointer; font-size:16px; font-weight:bold; padding:0 4px;" onclick="toggleCamera()">✕</span>
+            <span style="cursor:pointer; font-size:14px;" onclick="let b=document.getElementById('orbital-cam-box'); if(b._stream){b._stream.getTracks().forEach(t=>t.stop());} b.remove();">✕</span>
         </div>
-        <video id="orbital-cam-vid" autoplay playsinline style="width:100%; flex:1; object-fit:cover; background:#000; pointer-events:none;"></video>
+        <video id="orbital-cam-vid" autoplay playsinline style="width:100%; flex:1; object-fit:cover; background:#000;"></video>
     `;
     document.body.appendChild(box);
 
-    const header = document.getElementById("orbital-cam-header");
-    let isDragging = false, startX, startY, initX, initY;
-
-    header.onmousedown = (e) => {
+    let isDragging = false, startX, startY, initialX, initialY;
+    document.getElementById("orbital-cam-header").onmousedown = function(e) {
         isDragging = true;
         startX = e.clientX;
         startY = e.clientY;
-        const rect = box.getBoundingClientRect();
-        initX = rect.left;
-        initY = rect.top;
-        box.style.right = "auto";
+        initialX = box.offsetLeft;
+        initialY = box.offsetTop;
+        box.style.position = "fixed";
         box.style.bottom = "auto";
-        box.style.left = initX + "px";
-        box.style.top = initY + "px";
-        document.onmousemove = (ev) => {
-            if (!isDragging) return;
-            box.style.left = (initX + (ev.clientX - startX)) + "px";
-            box.style.top = (initY + (ev.clientY - startY)) + "px";
-        };
-        document.onmouseup = () => {
-            isDragging = false;
-            document.onmousemove = null;
-            document.onmouseup = null;
-        };
+        box.style.right = "auto";
+        box.style.left = initialX + "px";
+        box.style.top = initialY + "px";
+        e.preventDefault();
     };
+
+    window.onmousemove = function(e) {
+        if (!isDragging) return;
+        let dx = e.clientX - startX;
+        let dy = e.clientY - startY;
+        box.style.left = (initialX + dx) + "px";
+        box.style.top = (initialY + dy) + "px";
+    };
+
+    window.onmouseup = function() { isDragging = false; };
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -66,12 +63,13 @@ async function toggleCamera() {
 }
 """
 
-import re
 if "function toggleCamera()" in html:
-    html = re.sub(r"async function toggleCamera\(\)\s*\{[\s\S]*?\n\s*\}", draggable_func.strip(), html)
+    import re
+    html = re.sub(r'async function toggleCamera\(\)\s*\{.*?\}(?=\s*(?:async function|\<\!DOCTYPE|</html>|\Z))', draggable_func, html, flags=re.DOTALL)
 else:
     html = html.replace("</body>", f"<script>{draggable_func}</script>\n</body>")
 
-with open(p, "w", encoding="utf-8-sig") as f:
+with open(p, "w", encoding="utf-8") as f:
     f.write(html)
-print("[✔] Draggable camera successfully injected.")
+
+print("[✔] Draggable camera successfully configured.")

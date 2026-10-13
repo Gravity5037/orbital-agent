@@ -74,6 +74,4 @@ if __name__ == "__main__":
 
 with open(r"C:\Orbital\engine.py", "w", encoding="utf-8") as f:
     f.write(code)
-with open(r"C:\Orbital\core\engine.py", "w", encoding="utf-8") as f:
-    f.write(code)
-print("[✔] engine.py repaired without syntax errors.")
+print("[✔] engine.py syntax repaired.")

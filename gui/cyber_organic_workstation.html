@@ -1,315 +1,64 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Orbital OS - Cyber-Organic Workstation</title>
+    <title>Orbital OS - Host Node</title>
     <style>
-        :root {
-            --bg-deep: #080B10;
-            --glass-card: rgba(255, 255, 255, 0.04);
-            --glass-border: rgba(255, 255, 255, 0.12);
-            --glass-rim: rgba(255, 255, 255, 0.35);
-            --accent-cyan: #00F0FF;
-            --accent-purple: #B08CFF;
-            --text-glow: rgba(0, 240, 255, 0.4);
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, 'SF Pro Display', 'Segoe UI', sans-serif; }
-        body {
-            background: radial-gradient(circle at 15% 15%, #121824 0%, var(--bg-deep) 100%);
-            color: #FFF; height: 100vh; display: flex; overflow: hidden; padding: 20px; gap: 18px;
-        }
-
-        /* 1. FLOATING SIDEBAR CAPSULE */
-        .sidebar {
-            width: 250px; background: var(--glass-card); backdrop-filter: blur(28px);
-            border: 1px solid var(--glass-border); border-top: 1.5px solid var(--glass-rim);
-            border-radius: 28px; display: flex; flex-direction: column; padding: 22px 16px;
-            box-shadow: 0 24px 60px rgba(0,0,0,0.6);
-        }
-        .brand {
-            display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding: 0 8px;
-        }
-        .brand-title { font-weight: 700; letter-spacing: 2px; font-size: 1.1rem; color: #FFF; }
-
-        /* 3D GYRO CORE MINI */
-        .gyro-mini {
-            position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-        }
-        .gyro-ring {
-            position: absolute; border-radius: 50%; border: 1px solid var(--accent-cyan);
-            animation: spinRing 4s linear infinite;
-        }
-        .r1 { width: 28px; height: 28px; transform: rotateX(60deg); }
-        .r2 { width: 22px; height: 22px; transform: rotateY(60deg); animation-duration: 6s; border-color: var(--accent-purple); }
-        .r-dot { width: 4px; height: 4px; background: #FFF; border-radius: 50%; box-shadow: 0 0 8px var(--accent-cyan); }
-        @keyframes spinRing { 100% { transform: rotate(360deg); } }
-
-        .nav-link {
-            padding: 12px 16px; margin-bottom: 8px; border-radius: 18px; color: rgba(255,255,255,0.65);
-            display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.25s ease;
-            border: 1px solid transparent; font-size: 0.9rem; font-weight: 500;
-        }
-        .nav-link:hover, .nav-link.active {
-            background: rgba(255,255,255,0.08); color: #FFF; border-color: rgba(255,255,255,0.2);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.3); transform: translateY(-1px);
-        }
-
-        /* 2. MAIN WORKSPACE VIEWPORT */
-        .main-workstation {
-            flex: 1; background: var(--glass-card); backdrop-filter: blur(28px);
-            border: 1px solid var(--glass-border); border-top: 1.5px solid var(--glass-rim);
-            border-radius: 28px; display: flex; flex-direction: column; overflow: hidden;
-            box-shadow: 0 24px 60px rgba(0,0,0,0.6);
-        }
-        .top-hud {
-            height: 60px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-        }
-        .hud-status {
-            background: rgba(16, 185, 129, 0.12); color: #34D399; padding: 6px 14px;
-            border-radius: 999px; font-size: 0.78rem; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.3);
-            display: flex; align-items: center; gap: 6px;
-        }
-        .hud-pulse { width: 6px; height: 6px; border-radius: 50%; background: #34D399; box-shadow: 0 0 8px #34D399; }
-
-        .split-view { flex: 1; display: flex; overflow: hidden; }
-
-        /* CHAT INTERFACE & RADIAL ACTIONS */
-        .chat-column { flex: 1; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.08); }
-        .feed { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
-        .bubble {
-            max-width: 80%; padding: 14px 18px; border-radius: 20px; font-size: 0.92rem; line-height: 1.5;
-        }
-        .b-user {
-            align-self: flex-end; background: linear-gradient(135deg, rgba(0, 240, 255, 0.22), rgba(0, 163, 255, 0.1));
-            border: 1px solid rgba(0, 240, 255, 0.3); border-top: 1px solid rgba(255,255,255,0.4); color: #FFF;
-        }
-        .b-ai {
-            align-self: flex-start; background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.12); border-top: 1px solid rgba(255,255,255,0.3);
-        }
-
-        .composer {
-            padding: 16px 20px; display: flex; gap: 12px; border-top: 1px solid rgba(255,255,255,0.08);
-            position: relative; align-items: center;
-        }
-        .input-pill {
-            flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16);
-            border-top: 1px solid rgba(255,255,255,0.3); border-radius: 18px; padding: 12px 18px;
-            color: #FFF; font-size: 0.92rem; outline: none;
-        }
-        .input-pill:focus { border-color: var(--accent-cyan); box-shadow: 0 0 14px var(--text-glow); }
-
-        /* RADIAL ACTION BLOOM BUTTON */
-        .radial-action-wrap { position: relative; width: 44px; height: 44px; }
-        .radial-btn {
-            width: 44px; height: 44px; border-radius: 50%; background: #000;
-            border: 1px solid var(--accent-cyan); color: #FFF; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;
-            transition: all 0.3s ease; box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
-        }
-        .radial-btn:hover { transform: scale(1.08); background: var(--accent-cyan); color: #000; }
-        .radial-items {
-            position: absolute; bottom: 55px; right: 0; display: none; flex-direction: column; gap: 8px;
-        }
-        .radial-action-wrap.open .radial-items { display: flex; }
-        .r-item {
-            padding: 8px 14px; background: rgba(12, 16, 24, 0.95); border: 1px solid var(--accent-cyan);
-            border-radius: 14px; color: #FFF; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
-            transition: all 0.2s ease;
-        }
-        .r-item:hover { background: var(--accent-cyan); color: #000; transform: translateX(-4px); }
-
-        /* RIGHT SURFACE: LIVE HARDWARE TIMELINE & CONSOLE */
-        .surface-column { width: 48%; display: flex; flex-direction: column; background: rgba(0,0,0,0.5); }
-        .telemetry-card {
-            margin: 16px; padding: 16px; border-radius: 20px; background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px);
-        }
-        .tl-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        .tl-title { font-size: 0.82rem; font-weight: 600; letter-spacing: 1px; color: rgba(255,255,255,0.7); }
-        
-        .meter-track {
-            height: 10px; border-radius: 999px; background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.08); overflow: hidden; position: relative; margin-top: 6px;
-        }
-        .meter-fill {
-            height: 100%; border-radius: 999px;
-            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
-            width: 0%; transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-        .equalizer { display: flex; gap: 3px; align-items: flex-end; height: 16px; }
-        .eq-bar {
-            width: 3px; background: var(--accent-cyan); border-radius: 2px;
-            animation: eqPulse 1s ease-in-out infinite alternate;
-        }
-        .eq-bar:nth-child(2) { animation-delay: 0.2s; }
-        .eq-bar:nth-child(3) { animation-delay: 0.4s; }
-        .eq-bar:nth-child(4) { animation-delay: 0.6s; }
-        @keyframes eqPulse { 0% { height: 3px; } 100% { height: 16px; } }
-
-        iframe { flex: 1; border: none; width: 100%; }
+        body { margin: 0; background: #0B0E14; color: #E2E8F0; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 260px; background: rgba(18, 24, 38, 0.85); border-right: 1px solid rgba(0, 229, 255, 0.2); padding: 20px; }
+        .main-content { flex: 1; display: flex; flex-direction: column; }
+        .header { height: 60px; border-bottom: 1px solid rgba(0, 229, 255, 0.2); display: flex; align-items: center; padding: 0 25px; }
+        .workstation-split { flex: 1; display: flex; }
+        .chat-section { flex: 1; display: flex; flex-direction: column; border-right: 1px solid rgba(0, 229, 255, 0.2); }
+        .chat-container { flex: 1; padding: 25px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .input-bar { padding: 15px 25px; background: rgba(18, 24, 38, 0.85); border-top: 1px solid rgba(0, 229, 255, 0.2); display: flex; gap: 12px; }
+        input { flex: 1; background: rgba(11, 14, 20, 0.85); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: 8px; padding: 12px 16px; color: #FFF; outline: none; }
+        button { background: #00E5FF; color: #0B0E14; border: none; border-radius: 8px; padding: 0 24px; font-weight: bold; cursor: pointer; }
+        .terminal-section { width: 50%; background: #000; }
+        iframe { width: 100%; height: 100%; border: none; }
     </style>
 </head>
 <body>
     <div class="sidebar">
-        <div class="brand">
-            <div class="gyro-mini">
-                <div class="gyro-ring r1"></div>
-                <div class="gyro-ring r2"></div>
-                <div class="r-dot"></div>
-            </div>
-            <div class="brand-title">ORBITAL OS</div>
-        </div>
-        <div class="nav-link active" id="btn-chat">💬 Neural Core</div>
-        <div class="nav-link" id="btn-camera">📷 Optical Lens</div>
-        <div class="nav-link" id="btn-nebula">🎨 Nebula Studio</div>
-        <div class="nav-link" id="btn-audio">🎵 Acoustic Matrix</div>
+        <h3 style="color:#00E5FF; letter-spacing:2px;">🛸 ORBITAL OS</h3>
+        <p style="color:#94A3B8; cursor:pointer;">💬 Hive Chat Sync</p>
     </div>
-
-    <div class="main-workstation">
-        <div class="top-hud">
-            <h4 style="font-weight: 600; font-size: 0.95rem; letter-spacing: 0.5px;">CYBER-ORGANIC WORKSTATION</h4>
-            <div class="hud-status">
-                <div class="hud-pulse"></div>
-                LIVE KERNEL ONLINE
-            </div>
-        </div>
-        <div class="split-view">
-            <div class="chat-column">
-                <div class="feed" id="chat">
-                    <div class="bubble b-ai">
-                        <strong>Orbital Kernel:</strong> Real-time hardware telemetry and neural endpoints initialized.
-                    </div>
-                </div>
-                <div class="composer">
-                    <input type="text" id="userInput" class="input-pill" placeholder="Dispatch instructions or type /camera...">
-                    <div class="radial-action-wrap" id="radialWrap">
-                        <button class="radial-btn" id="radialBtn">+</button>
-                        <div class="radial-items">
-                            <div class="r-item" onclick="triggerCmd('/camera')">📷 Optical Eye</div>
-                            <div class="r-item" onclick="triggerCmd('/draw a cybernetic nebula orb')">🎨 Generate Visual</div>
-                            <div class="r-item" onclick="triggerCmd('/ps Get-Process | Select -First 5')">⚡ Top Processes</div>
-                        </div>
-                    </div>
+    <div class="main-content">
+        <div class="header"><h3 style="margin:0;">Cyber-Organic Workstation</h3></div>
+        <div class="workstation-split">
+            <div class="chat-section">
+                <div class="chat-container" id="chat"></div>
+                <div class="input-bar">
+                    <input type="text" id="userInput" onkeydown="if(event.key==='Enter') sendMsg()">
+                    <button onclick="sendMsg()">Send</button>
                 </div>
             </div>
-
-            <div class="surface-column">
-                <div class="telemetry-card">
-                    <div class="tl-row">
-                        <div class="tl-title">HOST TELEMETRY (LIVE KERNEL)</div>
-                        <div class="equalizer">
-                            <div class="eq-bar"></div><div class="eq-bar"></div>
-                            <div class="eq-bar"></div><div class="eq-bar"></div>
-                        </div>
-                    </div>
-                    <div style="font-size: 0.76rem; color: rgba(255,255,255,0.6); display: flex; justify-content: space-between;">
-                        <span>CPU UTILIZATION</span>
-                        <span id="cpuText">Checking...</span>
-                    </div>
-                    <div class="meter-track">
-                        <div class="meter-fill" id="cpuBar"></div>
-                    </div>
-
-                    <div style="font-size: 0.76rem; color: rgba(255,255,255,0.6); display: flex; justify-content: space-between; margin-top: 10px;">
-                        <span>RAM ALLOCATION</span>
-                        <span id="ramText">Checking...</span>
-                    </div>
-                    <div class="meter-track">
-                        <div class="meter-fill" id="ramBar"></div>
-                    </div>
-                </div>
-                <iframe src="http://127.0.0.1:7681"></iframe>
+            <div class="terminal-section">
+                <iframe src="http://127.0.0.1:7681/"></iframe>
             </div>
         </div>
     </div>
-
     <script>
-        // Radial menu toggle
-        const radialWrap = document.getElementById('radialWrap');
-        document.getElementById('radialBtn').onclick = () => {
-            radialWrap.classList.toggle('open');
-        };
-
-        function triggerCmd(cmd) {
-            document.getElementById('userInput').value = cmd;
-            radialWrap.classList.remove('open');
-            doSend();
-        }
-
-        async function doSend() {
-            const input = document.getElementById('userInput');
-            const chat = document.getElementById('chat');
-            const val = input.value.trim();
-            if (!val) return;
-            chat.innerHTML += '<div class="bubble b-user"><strong>You:</strong> ' + val + '</div>';
-            input.value = '';
-            chat.scrollTop = chat.scrollHeight;
-
-            const id = 'msg-' + Date.now();
-            chat.innerHTML += '<div class="bubble b-ai" id="' + id + '"><strong>Orbital:</strong> <em>Executing...</em></div>';
-            chat.scrollTop = chat.scrollHeight;
-
+        let lastLog = -1;
+        setInterval(async () => {
             try {
-                const res = await fetch('http://127.0.0.1:5000/api/chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({prompt: val})
-                });
-                const d = await res.json();
-                document.getElementById(id).innerHTML = '<strong>Orbital:</strong> ' + d.response;
-            } catch(e) {
-                document.getElementById(id).innerHTML = '<strong>Orbital:</strong> [Error: ' + e.message + ']';
-            }
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        document.getElementById('userInput').onkeydown = (e) => { if (e.key === 'Enter') doSend(); };
-        document.getElementById('btn-camera').onclick = () => triggerCmd('/camera');
-
-        // Polling Real System Metrics
-        async function updateTelemetry() {
-            try {
-                const res = await fetch('http://127.0.0.1:5000/api/chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({prompt: '/telemetry'})
-                });
-                const d = await res.json();
-                const m = JSON.parse(d.response);
-                document.getElementById('cpuText').innerText = m.cpu_pct + '%';
-                document.getElementById('cpuBar').style.width = Math.min(100, m.cpu_pct) + '%';
-                document.getElementById('ramText').innerText = m.ram_used + ' GB / ' + m.ram_total + ' GB (' + m.ram_pct + '%)';
-                document.getElementById('ramBar').style.width = m.ram_pct + '%';
+                const res = await fetch('http://127.0.0.1:5000/api/sync');
+                const data = await res.json();
+                if(data.log && data.log.length !== lastLog) {
+                    lastLog = data.log.length;
+                    document.getElementById('chat').innerHTML = data.log.map(m => {
+                        let isU = m.sender === 'user';
+                        return `<div style="max-width:85%; padding:12px; margin-bottom:10px; border-radius:10px; align-self:${isU ? 'flex-end' : 'flex-start'}; background:${isU ? 'rgba(0,229,255,0.15)' : 'rgba(18,24,38,0.85)'}; border:1px solid rgba(0,229,255,0.2); color:#FFF;"><strong>${isU ? 'You' : '🛸 Orbital'}:</strong> <span style="white-space:pre-wrap">${m.text}</span></div>`;
+                    }).join('');
+                    document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+                }
             } catch(e) {}
+        }, 1000);
+        async function sendMsg() {
+            const v = document.getElementById('userInput').value;
+            if(!v.trim()) return;
+            document.getElementById('userInput').value = '';
+            fetch('http://127.0.0.1:5000/api/chat', { method: 'POST', body: JSON.stringify({prompt: v}) });
         }
-        setInterval(updateTelemetry, 3000);
-        updateTelemetry();
     </script>
-
-<script>
-function triggerHeal() {
-  const status = document.getElementById('heal-status');
-  status.innerText = 'Scanning & Optimizing...';
-  fetch('http://127.0.0.1:5000/api/chat', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({prompt: '/heal'})
-  })
-  .then(r => r.json())
-  .then(data => {
-    status.innerText = 'Heal Complete';
-    const chat = document.querySelector('.chat-messages') || document.body;
-    const msg = document.createElement('div');
-    msg.style = 'background: rgba(0,240,255,0.1); border-left: 3px solid #00f0ff; padding: 10px; margin: 10px 0; border-radius: 6px; white-space: pre-wrap; font-family: monospace; font-size: 11px; color: #a6daff;';
-    msg.innerText = data.response;
-    chat.appendChild(msg);
-  })
-  .catch(err => {
-    status.innerText = 'Engine unreachable';
-  });
-}
-</script>
 </body>
 </html>
