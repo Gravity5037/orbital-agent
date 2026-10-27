@@ -348,6 +348,43 @@ Rules:
 """
 
 
+CLAIM_WORDS = (
+    "captured",
+    "saved as",
+    "image saved",
+    "has been saved",
+    "photo saved",
+    "i took",
+    "i have taken",
+    "i can see",
+    "i have accessed",
+    "i have run",
+    "the tool",
+    "authenticate",
+    "no cameras",
+    "no camera",
+    "not connected",
+    "unavailable",
+    "maintenance",
+    "the command provided",
+)
+
+NO_CLAIM = ("I did not run anything, so I cannot confirm that. "
+            "Type a command directly - /health, /snapshot, /lights - "
+            "and it will actually run.")
+
+
+def guard_claim(reply, steps):
+    """Refuse an answer that describes a tool running when none did."""
+    if steps:
+        return reply
+    low = (reply or "").lower()
+    for word in CLAIM_WORDS:
+        if word in low:
+            return NO_CLAIM
+    return reply
+
+
 def ask(question, approve=None, model=None, timeout=300):
     """Answer a question, calling tools as needed."""
     try:

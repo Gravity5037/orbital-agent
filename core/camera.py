@@ -280,7 +280,11 @@ def handle(text):
 
     if low.startswith("/snapshot "):
         source = t[10:].strip()
-        if source.isdigit():
+        if not source:
+            # A bare /snapshot means the default camera.
+            # It parsed to '' and VideoCapture('') failed.
+            source = 0
+        elif source.isdigit():
             source = int(source)
         try:
             result = snapshot(source)

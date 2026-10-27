@@ -1162,6 +1162,21 @@ $("continue").onclick = () => { window.location.href = "/"; };
                 return
             use_llm = bool(payload.get("llm", True))
 
+            # Slash commands are answered locally, before the model.
+            # They exist so a command runs deterministically, and a
+            # small model will invent the result instead. /snapshot
+            # came back as "Image saved as snapshot.jpg" with nothing
+            # saved, because the agent loop ran first.
+            if prompt.startswith("/"):
+                local, local_meta = handle_prompt(prompt, use_llm=False)
+                with _MEMORY_LOCK:
+                    st = store()
+                    st.add_message("user", prompt)
+                    st.add_message("assistant", local)
+                save_state()
+                self._json(200, {"response": local, "meta": local_meta})
+                return
+
             # Route through the agent loop so a tool call runs instead
             # of being printed as text. Falls back to the plain handler
             # if the agent module is absent or the model is unreachable.

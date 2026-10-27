@@ -35,22 +35,60 @@ BACKOFF_BASE = 2.0
 BACKOFF_CAP = 60.0
 HEALTH_INTERVAL = 5.0
 
+# Each service declares the port it binds. The supervisor checks the
+# port before spawning: a process orphaned by a force-kill keeps it,
+# and spawning into that wall gives five restarts and no explanation.
 SERVICES = [
-    {"name": "engine", "module": "core.engine"},
-    {"name": "mesh", "module": "core.mesh"},
+    {"name": "engine", "module": "core.engine", "port": "ENGINE_PORT"},
+    {"name": "mesh", "module": "core.mesh", "port": "MESH_PORT"},
 ]
+
+
+def port_holder(port, host="127.0.0.1"):
+    """Is anything already bound to this port? True or False.
+
+    A bind test, not a connect test: we want to know whether we can
+    take the port, not whether something answers on it.
+    """
+    import socket as _socket
+
+    probe = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    try:
+        probe.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+        probe.bind((host, int(port)))
+        return False          # we got it, so nobody else has it
+    except OSError:
+        return True           # in use
+    finally:
+        probe.close()
 
 
 class Service:
     def __init__(self, spec):
         self.name = spec["name"]
         self.module = spec["module"]
+        self.port_attr = spec.get("port")
         self.proc = None
         self.restarts = 0
         self.next_start = 0.0
         self.given_up = False
 
     def spawn(self):
+        # Check the port before spawning. An orphan from a force-killed
+        # supervisor keeps it, and spawning into that produces five
+        # silent restarts. Name the holder instead.
+        if getattr(self, "port_attr", None):
+            port = getattr(config, self.port_attr, None)
+            if port and port_holder(port):
+                log.error(
+                    f"{self.name}: port {port} is already in use - not "
+                    f"spawning. Something is still running from an "
+                    f"earlier session. Find it with:  netstat -ano | "
+                    f"findstr :{port}"
+                )
+                self.given_up = True
+                return
+
         argv = [sys.executable, "-m", self.module]
         creationflags = 0
         if os.name == "nt":

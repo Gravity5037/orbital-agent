@@ -182,6 +182,20 @@ def main():
     except KeyboardInterrupt:
         mesh.stop()
         log.info("mesh stopped")
+    except OSError as exc:
+        # Almost always the port is held by an instance that did not
+        # shut down. Say so, and exit 0 - crashing tells the operator
+        # nothing and the supervisor just restarts into the same wall.
+        log.error(
+            f"mesh could not bind "
+            f"{config.MESH_HOST}:{config.MESH_PORT} - {exc}. "
+            f"Another process is holding that port. Find it with: "
+            f"netstat -ano | findstr :{config.MESH_PORT}"
+        )
+        return 0
+    except Exception as exc:
+        log.error(f"mesh failed: {type(exc).__name__}: {exc}")
+        return 0
     return 0
 
 
