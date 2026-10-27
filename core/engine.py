@@ -128,23 +128,70 @@ def run_shell(cmd):
 # two nodes that both talked offline could not be reconciled. The state store
 # gives every message an id and a Lamport stamp, which is what makes merge
 # commutative and idempotent.
-_STORE = None
+# One store per user, built on first use.
+#
+# This was a single global. That meant every logged-in user shared one
+# conversation. It is now keyed by username: a guest (no accounts, or
+# not signed in) gets the original store, and each account gets its own
+# file under state/profiles/<name>/.
+#
+# The isolation is the filesystem's job, not a query filter. A separate
+# file per user cannot leak through a forgotten WHERE clause.
+_STORES = {}
+_STORE_LOCK = threading.Lock()
+
+# The user the current request belongs to. Set by the request handler
+# before any store() call. Thread-local, because requests are threaded.
+_CURRENT_USER = threading.local()
 
 
-def store():
-    """Lazy singleton for the live state."""
-    global _STORE
-    if _STORE is None:
-        from . import statestore
+def set_current_user(username):
+    """Who is asking. None means the guest store."""
+    _CURRENT_USER.name = username or None
 
-        s = statestore.StateStore()
+
+def current_user():
+    return getattr(_CURRENT_USER, "name", None)
+
+
+def store(username=None):
+    """The live state for one user.
+
+    username=None means the guest store. Passing it explicitly is for
+    callers that are not in a request thread - the CLI, a test.
+    """
+    global _STORES
+
+    if username is None:
+        username = current_user()
+
+    key = username or ""
+
+    with _STORE_LOCK:
+        if key in _STORES:
+            return _STORES[key]
+
+        from . import statestore, profiles
+
+        path = profiles.ensure(username)
+        s = statestore.StateStore(path=path)
         loaded = s.load(missing_ok=True)
+
+        who = username or "guest"
         if loaded:
-            log.info(f"state loaded: {len(s.messages)} message(s) from {s.path}")
+            log.info(f"state loaded for {who}: "
+                     f"{len(s.messages)} message(s) from {s.path}")
         else:
-            log.info(f"no existing state at {s.path}; starting fresh")
-        _STORE = s
-    return _STORE
+            log.info(f"no existing state for {who} at {s.path}; fresh start")
+
+        _STORES[key] = s
+        return s
+
+
+def forget_store(username):
+    """Drop a cached store. Used when a profile is purged."""
+    with _STORE_LOCK:
+        _STORES.pop(username or "", None)
 
 
 def save_state():
@@ -291,6 +338,28 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 
+    def _bind_user(self):
+        """Point the store at this request's user.
+
+        Called at the top of every request. Without it, a request from
+        one user could read or write another user's conversation,
+        because the store is cached per-process.
+        """
+        try:
+            from . import accounts
+        except ImportError:
+            set_current_user(None)
+            return
+
+        if not accounts.enabled():
+            # No accounts at all. Single-user install. Guest store.
+            set_current_user(None)
+            return
+
+        token = self._cookies().get("orbital_session")
+        user = accounts.session_user(token) if token else None
+        set_current_user(user)
+
     def _authed(self):
         # Three ways in, in order of preference:
         #   1. a logged-in session cookie, when accounts are enabled
@@ -330,18 +399,20 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     LOGIN_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Orbital - sign in</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orbital</title>
 <style>
  body{margin:0;min-height:100vh;background:#04060B;color:#F0F4FF;
       font:15px/1.6 "Segoe UI",system-ui,sans-serif;
-      display:flex;align-items:center;justify-content:center}
- .card{width:340px;padding:32px;border-radius:22px;
+      display:flex;align-items:center;justify-content:center;padding:20px}
+ .card{width:360px;padding:32px;border-radius:22px;
        background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
        backdrop-filter:blur(20px)}
  h1{font-size:22px;margin:0 0 4px;font-weight:800;letter-spacing:-.02em}
  p.sub{color:#5A6786;font-size:12px;margin:0 0 22px}
  label{display:block;font-size:11px;text-transform:uppercase;
        letter-spacing:.14em;color:#5A6786;margin:14px 0 6px}
+ .opt{text-transform:none;letter-spacing:0;color:#3F4A63;font-size:10px}
  input{width:100%;box-sizing:border-box;padding:11px 14px;border-radius:999px;
        background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.09);
        color:#F0F4FF;font:14px inherit;outline:none}
@@ -349,19 +420,153 @@ class Handler(BaseHTTPRequestHandler):
  button{width:100%;margin-top:20px;padding:12px;border:none;border-radius:999px;
         background:linear-gradient(115deg,#8B5CF6,#FF3D9A);color:#fff;
         font:600 14px inherit;cursor:pointer}
+ button:disabled{opacity:.5;cursor:default}
  .err{margin-top:14px;color:#FECDD3;font-size:13px;display:none}
  .err.on{display:block}
+ .ok{margin-top:14px;color:#86EFAC;font-size:13px;display:none}
+ .ok.on{display:block}
+ .swap{margin-top:18px;text-align:center;font-size:13px;color:#5A6786}
+ .swap a{color:#8B5CF6;text-decoration:none;cursor:pointer}
+ .swap a:hover{text-decoration:underline}
+ .hint{font-size:11px;color:#3F4A63;margin-top:6px}
+ .code{font:600 15px ui-monospace,monospace;letter-spacing:.03em;
+       background:rgba(0,0,0,.4);border:1px solid rgba(139,92,246,.4);
+       border-radius:10px;padding:14px;margin-top:12px;word-break:break-word;
+       color:#C4B5FD}
+ .warn{margin-top:12px;font-size:12px;color:#FCD34D}
+ .taken{font-size:11px;margin-top:6px;color:#FCA5A5;display:none}
+ .taken.on{display:block}
+ .avail{font-size:11px;margin-top:6px;color:#86EFAC;display:none}
+ .avail.on{display:block}
+ .hidden{display:none}
 </style></head><body>
-<form class="card" method="POST" action="/login">
+
+<!-- ------------------------------------------------ sign in -->
+<form class="card" id="signin" method="POST" action="/login">
  <h1>Orbital</h1>
  <p class="sub">Sign in to continue</p>
  <label for="u">Username</label>
  <input id="u" name="username" autocomplete="username" autofocus>
  <label for="p">Password</label>
  <input id="p" name="password" type="password" autocomplete="current-password">
- <button type="submit">Sign in</button>
+ <button type="submit">Log in</button>
  <div class="err __ERR__">__MSG__</div>
-</form></body></html>"""
+ <div class="swap">New here? <a id="to-signup">Sign up</a></div>
+</form>
+
+<!-- ------------------------------------------------ sign up -->
+<form class="card hidden" id="signup" method="POST" action="/signup">
+ <h1>Create account</h1>
+ <p class="sub">Your own Orbital, on this machine</p>
+
+ <label for="su">Username</label>
+ <input id="su" name="username" autocomplete="username"
+        placeholder="Gravity" autocomplete="off">
+ <div class="taken" id="taken">That username is taken.</div>
+ <div class="avail" id="avail">Available</div>
+ <div class="hint">3+ characters. Letters, numbers, dot, dash, underscore.</div>
+
+ <label for="se">Email <span class="opt">(optional)</span></label>
+ <input id="se" name="email" type="email" autocomplete="email"
+        placeholder="you@example.com">
+
+ <label for="sp">Phone <span class="opt">(optional)</span></label>
+ <input id="sp" name="phone" type="tel" autocomplete="tel"
+        placeholder="+1 555 000 0000">
+
+ <label for="spw">Password</label>
+ <input id="spw" name="password" type="password"
+        autocomplete="new-password">
+ <div class="hint">8+ characters.</div>
+
+ <button type="submit" id="create">Create account</button>
+ <div class="err" id="su-err"></div>
+ <div class="swap">Already a member?
+   <a id="to-signin">Log in</a></div>
+</form>
+
+<!-- ------------------------------------------------ recovery code -->
+<div class="card hidden" id="done">
+ <h1>Save this code</h1>
+ <p class="sub">This is the only time it is shown</p>
+ <p style="font-size:13px;color:#9AA3B2">
+   If you forget your password, this code resets it. Write it down
+   or put it in a password manager.
+ </p>
+ <div class="code" id="code-out"></div>
+ <div class="warn">
+   Orbital cannot email this to you. There is no mail server, and
+   nothing leaves this machine. If you lose the code and the
+   password, an admin has to reset the account.
+ </div>
+ <button id="continue">I saved it - continue</button>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const show = (el) => el.classList.remove("hidden");
+const hide = (el) => el.classList.add("hidden");
+
+$("to-signup").onclick = () => { hide($("signin")); show($("signup"));
+                                 $("su").focus(); };
+$("to-signin").onclick = () => { hide($("signup")); show($("signin"));
+                                 $("u").focus(); };
+
+// Live username check, so you know before you submit.
+let checkTimer = null;
+$("su").addEventListener("input", () => {
+  const name = $("su").value.trim();
+  $("taken").classList.remove("on");
+  $("avail").classList.remove("on");
+  clearTimeout(checkTimer);
+  if (name.length < 3) return;
+  checkTimer = setTimeout(async () => {
+    try {
+      const r = await fetch("/api/username?name=" + encodeURIComponent(name));
+      const d = await r.json();
+      if (d.taken) { $("taken").classList.add("on"); }
+      else { $("avail").classList.add("on"); }
+    } catch (e) { /* not fatal - the server checks on submit anyway */ }
+  }, 350);
+});
+
+$("signup").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("su-err").classList.remove("on");
+  $("create").disabled = true;
+
+  const body = new URLSearchParams(new FormData($("signup")));
+  try {
+    const r = await fetch("/signup", { method: "POST", body: body });
+    const d = await r.json();
+
+    if (!r.ok || d.error) {
+      $("su-err").textContent = d.error || ("Could not create the account.");
+      $("su-err").classList.add("on");
+      $("create").disabled = false;
+      return;
+    }
+
+    // Show the recovery code. Nothing else happens until it is saved.
+    $("code-out").textContent = d.recovery_code;
+    hide($("signup"));
+    show($("done"));
+  } catch (e) {
+    $("su-err").textContent = "Could not reach the engine. Is it running?";
+    $("su-err").classList.add("on");
+    $("create").disabled = false;
+  }
+});
+
+$("continue").onclick = () => { window.location.href = "/"; };
+</script>
+</body></html>"""
+
+    def _approve_tool(self, name, args):
+        """May this tool run? Only write tools reach here."""
+        log.info(f"the model asked to run '{name}' - refusing, "
+                 f"no approval channel yet")
+        return False
 
     def _login_page(self, message="", error=False):
         html = self.LOGIN_HTML.replace("__MSG__", message)
@@ -433,6 +638,113 @@ class Handler(BaseHTTPRequestHandler):
             self._json(500, {"error": f"could not read {path}: {exc}"})
             return
 
+        # Inject a small admin panel for owners and admins. It is inert
+        # for members: the server refuses every role change they attempt,
+        # so hiding it is convenience, not the security boundary.
+        panel = """
+<div id="admin-panel" style="display:none;position:fixed;right:18px;bottom:18px;
+     z-index:800;width:320px;max-height:70vh;overflow:auto;
+     background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+     border-radius:16px;padding:16px;backdrop-filter:blur(20px);
+     font:13px/1.5 'Segoe UI',system-ui,sans-serif;color:#F0F4FF">
+  <div style="display:flex;justify-content:space-between;align-items:center;
+       margin-bottom:10px">
+    <strong style="font-size:12px;letter-spacing:.1em;
+            text-transform:uppercase;color:#5A6786">Accounts</strong>
+    <span id="admin-close" style="cursor:pointer;color:#5A6786">x</span>
+  </div>
+  <div id="admin-list"></div>
+  <div id="admin-msg" style="margin-top:10px;font-size:12px"></div>
+</div>
+<button id="admin-open" style="display:none;position:fixed;right:18px;bottom:18px;
+        z-index:799;padding:10px 16px;border:none;border-radius:999px;
+        background:linear-gradient(115deg,#8B5CF6,#FF3D9A);color:#fff;
+        font:600 12px inherit;cursor:pointer">Accounts</button>
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+  let ME = null;
+
+  async function whoami(){
+    try {
+      const r = await fetch('/api/whoami');
+      return await r.json();
+    } catch(e){ return {username:null}; }
+  }
+
+  async function load(){
+    const r = await fetch('/api/accounts');
+    if (!r.ok) { $('admin-list').textContent = 'Not permitted.'; return; }
+    const d = await r.json();
+    const owner = d.owner;
+    $('admin-list').innerHTML = '';
+    d.accounts.forEach(a => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;justify-content:space-between;'
+        + 'align-items:center;padding:6px 0;'
+        + 'border-bottom:1px solid rgba(255,255,255,.05)';
+      const isMe = a.username === d.you;
+      const isOwner = a.username === owner;
+      const roleColor = a.role === 'owner' ? '#FCD34D'
+                      : a.role === 'admin' ? '#8B5CF6' : '#5A6786';
+      row.innerHTML = '<span>' + a.username
+        + (isMe ? ' <em style="color:#5A6786">(you)</em>' : '')
+        + '<br><span style="font-size:11px;color:' + roleColor + '">'
+        + a.role + '</span></span>';
+
+      // The owner cannot be changed by anyone. An admin cannot be
+      // changed by another admin. The buttons reflect that, and the
+      // server refuses anyway.
+      if (!isOwner && !isMe) {
+        const btn = document.createElement('button');
+        const target = a.role === 'admin' ? 'member' : 'admin';
+        btn.textContent = a.role === 'admin' ? 'Demote' : 'Promote';
+        btn.style.cssText = 'padding:5px 11px;border-radius:999px;border:1px solid'
+          + ' rgba(255,255,255,.14);background:transparent;color:#F0F4FF;'
+          + 'font:11px inherit;cursor:pointer';
+        btn.onclick = () => change(a.username, target);
+        row.appendChild(btn);
+      }
+      $('admin-list').appendChild(row);
+    });
+  }
+
+  async function change(username, role){
+    const r = await fetch('/api/role', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username: username, role: role})
+    });
+    const d = await r.json();
+    $('admin-msg').textContent = d.message || d.error || '';
+    $('admin-msg').style.color = r.ok ? '#86EFAC' : '#FCA5A5';
+    load();
+  }
+
+  $('admin-open').onclick = () => {
+    $('admin-panel').style.display = 'block';
+    $('admin-open').style.display = 'none';
+    load();
+  };
+  $('admin-close').onclick = () => {
+    $('admin-panel').style.display = 'none';
+    $('admin-open').style.display = 'block';
+  };
+
+  whoami().then(w => {
+    ME = w;
+    // Only owners and admins see the button. Members are refused
+    // server-side if they call the endpoint directly.
+    if (w.role === 'owner' || w.role === 'admin') {
+      $('admin-open').style.display = 'block';
+    }
+  });
+})();
+</script>
+"""
+
+        if "</body>" in html:
+            html = html.replace("</body>", panel + "\n</body>", 1)
+
         # Inject the token so the page needs no manual setup.
         token = auth.get_token()
         inject = (
@@ -453,6 +765,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        self._bind_user()
         route = urllib.parse.urlparse(self.path).path
 
         if route in ("/", "/ui", "/index.html"):
@@ -473,9 +786,54 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
+        # --- who am I? The UI uses this to decide what to show.
+        if route == "/api/whoami":
+            from . import accounts
+            me = None
+            if accounts.enabled():
+                me = accounts.session_user(
+                    self._cookies().get("orbital_session"))
+            self._json(200, {
+                "authenticated": True,
+                "username": me,
+                "role": accounts.role_of(me) if me else None,
+                "is_owner": accounts.is_owner(me) if me else False,
+                "accounts_enabled": accounts.enabled(),
+            })
+            return
+
+        # --- the roster. Owner and admins only.
+        if route == "/api/accounts":
+            from . import accounts
+
+            me = accounts.session_user(
+                self._cookies().get("orbital_session")) if accounts.enabled() else None
+            if accounts.enabled() and accounts.role_of(me) == accounts.MEMBER:
+                self._json(403, {"error": "not permitted"})
+                return
+
+            rows = accounts.roster()
+            self._json(200, {
+                "accounts": rows,
+                "owner": accounts.owner_name(),
+                "you": me,
+            })
+            return
+
         if route == "/api/ping":
             self._json(200, {"ok": True, "node": config.node_id()})
             return
+
+        # --- is this username free? Called live from the signup form.
+        if route == "/api/username":
+            from . import accounts
+            q = urllib.parse.parse_qs(
+                urllib.parse.urlparse(self.path).query)
+            name = (q.get("name") or [""])[0]
+            self._json(200, {"name": name.strip().lower(),
+                             "taken": accounts.taken(name)})
+            return
+
         if not self._authed():
             return
 
@@ -645,10 +1003,113 @@ class Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": "not found"})
 
     def do_POST(self):
+        self._bind_user()
         route = urllib.parse.urlparse(self.path).path
 
         # The login form posts here, and cannot require a token - the user
         # does not have one yet.
+        # --- create an account
+        if route == "/signup":
+            from . import accounts
+
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            if length > 8192:
+                self._json(413, {"error": "payload too large"})
+                return
+            raw = self.rfile.read(length).decode("utf-8", errors="replace")
+            form = urllib.parse.parse_qs(raw)
+
+            username = (form.get("username") or [""])[0]
+            password = (form.get("password") or [""])[0]
+            email = (form.get("email") or [""])[0]
+            phone = (form.get("phone") or [""])[0]
+
+            try:
+                result = accounts.add_user(
+                    username, password, email=email, phone=phone)
+            except ValueError as exc:
+                # A refusal is an answer. Tell the form exactly why.
+                self._json(400, {"error": str(exc)})
+                return
+            except Exception as exc:
+                log.error(f"signup failed: {exc}")
+                self._json(500, {"error": "could not create the account"})
+                return
+
+            log.info(f"signup: {result['username']}")
+            # The recovery code is returned once and never again.
+            self._json(200, {
+                "username": result["username"],
+                "recovery_code": result["recovery_code"],
+            })
+            return
+
+        # --- reset a password with a recovery code
+        if route == "/recover":
+            from . import accounts
+
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            if length > 8192:
+                self._json(413, {"error": "payload too large"})
+                return
+            raw = self.rfile.read(length).decode("utf-8", errors="replace")
+            form = urllib.parse.parse_qs(raw)
+
+            try:
+                result = accounts.recover_with_code(
+                    (form.get("username") or [""])[0],
+                    (form.get("code") or [""])[0],
+                    (form.get("password") or [""])[0])
+            except ValueError as exc:
+                self._json(400, {"error": str(exc)})
+                return
+
+            self._json(200, {
+                "username": result["username"],
+                "new_recovery_code": result["new_recovery_code"],
+            })
+            return
+
+        # --- role changes. Every one checks who is asking.
+        if route in ("/api/role", "/api/remove"):
+            from . import accounts
+
+            me = accounts.session_user(
+                self._cookies().get("orbital_session")) if accounts.enabled() else None
+
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            raw = self.rfile.read(length).decode("utf-8", errors="replace")
+            payload = {}
+            try:
+                payload = json.loads(raw) if raw else {}
+            except json.JSONDecodeError:
+                payload = {k: v[0] for k, v in
+                           urllib.parse.parse_qs(raw).items()}
+
+            target = str(payload.get("username", "")).strip().lower()
+            if not target:
+                self._json(400, {"error": "no username given"})
+                return
+
+            if route == "/api/role":
+                role = str(payload.get("role", "")).strip().lower()
+                ok, msg = accounts.set_role(me, target, role)
+            else:
+                ok, reason = accounts.can_manage(me, target)
+                if ok and target == me:
+                    ok, reason = False, "you cannot remove your own account."
+                if ok:
+                    accounts.remove_user(target)
+                    msg = f"{target} removed"
+                else:
+                    msg = reason
+
+            if not ok:
+                self._json(403, {"error": msg})
+                return
+            self._json(200, {"ok": True, "message": msg})
+            return
+
         if route == "/login":
             from . import accounts
 
@@ -700,7 +1161,31 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(400, {"error": "empty prompt"})
                 return
             use_llm = bool(payload.get("llm", True))
-            text, meta = handle_prompt(prompt, use_llm=use_llm)
+
+            # Route through the agent loop so a tool call runs instead
+            # of being printed as text. Falls back to the plain handler
+            # if the agent module is absent or the model is unreachable.
+            text, meta = None, None
+            if use_llm:
+                try:
+                    from . import agent
+                    result = agent.ask(
+                        prompt,
+                        approve=self._approve_tool,
+                        model=payload.get("model"),
+                    )
+                    text = result["answer"]
+                    meta = {"kind": "agent",
+                            "calls": result.get("calls_made", 0)}
+                    if result.get("exhausted"):
+                        meta["kind"] = "agent-stopped"
+                except ImportError:
+                    pass
+                except Exception as exc:
+                    log.warn(f"agent loop unavailable: {exc}")
+
+            if text is None:
+                text, meta = handle_prompt(prompt, use_llm=use_llm)
             with _MEMORY_LOCK:
                 st = store()
                 st.add_message("user", prompt)

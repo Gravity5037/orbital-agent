@@ -1,0 +1,10 @@
+{
+    "app_name": "Orbital Workstation",
+    "logo_name": "Orbital Alien Planet Assistant Logo",
+    "assets": [
+        "logo.png",
+        "logo.ico",
+        "banner.png"
+    ],
+    "color_theme": "Midnight Obsidian / Cyan Accent"
+}

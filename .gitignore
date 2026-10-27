@@ -43,3 +43,8 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
+
+# --- local backups and one-shot patches, never commit ---
+*.bak
+*_backup.py
+patch_*.py

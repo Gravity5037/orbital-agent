@@ -214,9 +214,42 @@ def get(name):
     return None
 
 
+QUALITY_TIERS = [
+    (100, ("flux",)),
+    (80, ("pony", "illustrious", "noobai", "hassaku", "realvis",
+          "juggernaut", "dreamshaper")),
+    (60, ("sdxl", "sd_xl")),
+    (40, ("sd3", "stable-diffusion-3")),
+    (20, ("v1-5", "sd15", "sd_15")),
+    (10, ()),
+]
+
+
+def quality_of(backend):
+    """Best model tier this backend has, from its installed checkpoints."""
+    try:
+        cap = backend.capability()
+    except Exception:
+        return 0, "unreachable"
+    names = [str(c).lower() for c in cap.get("checkpoints", [])]
+    if not names:
+        return 0, "no checkpoints"
+    best_score, best_label = 0, "unknown"
+    for score, markers in QUALITY_TIERS:
+        for n in names:
+            if any(m in n for m in markers):
+                if score > best_score:
+                    best_score, best_label = score, n
+        if best_score:
+            break
+    return best_score, best_label
+
+
 def _score(backend, status):
-    """Lower is better. Load divided by weight, so a beefier node takes more."""
-    return status["load"] / max(backend.weight, 0.01)
+    """Lower is better. Quality dominates; load only breaks ties."""
+    quality, _label = quality_of(backend)
+    load_penalty = status["load"] / max(backend.weight, 0.01)
+    return -quality + (load_penalty * 0.01)
 
 
 def choose(kind="image", exclude=()):
