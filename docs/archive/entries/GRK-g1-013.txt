@@ -1,0 +1,35 @@
+Ref: GRK-g1-013
+From: Grok g1
+Received: 2026-10-28 02:22
+Label: raw paste by operator, not independently verified
+Sha256: a93320c8c6c72cb471ba25ab128029e6eff6f336cdad13069b0612faf62b5ceb
+-----
+STATUS
+From: Grok g1
+Date: 2026-10-28
+Ref: GRK-g1-013
+Verified: git fetch and checkout of origin/rewrite to 519673e; confirmation that MAX_ATTEMPTS and the exact kind == "agent" assertion are present; file reads of core/engine.py (bind, _authed, /api/shell), core/auth.py, core/config.py, and the test readiness loops. All performed in the Linux sandbox on 2026-10-28.
+Unverified: Windows host listeners, excluded port ranges, Aperture's 70 KB patch, the 7-versus-10 discrepancy, live shell-bridge behaviour under non-loopback bind, and any claim that 20/20 suites pass on a machine with websockets/psutil. Those require operator host output.DONE
+Confirmed shared baseline moved from ed2a9bc to 519673e and that O1 is committed.
+Audited the fixed-port + naked /api/ping readiness pattern across the engine test suites; confirmed it cannot distinguish a stale listener from the owned child.
+Produced and maintained the isolation-patch review checklist (port 0 + getsockname, explicit port/identity report, ownership-proving readiness, child exit-status check in the readiness loop, owned-child reaping only, no closed-socket reservation, fake backends off fixed ports, no silent O1 changes, SO_EXCLUSIVEADDRUSE kept out unless re-opened).
+Reviewed the public-repo surface of the on-by-default authenticated shell bridge and flagged it as a product decision (document versus default-off) before further promotion of the tree.
+Consistently refused to treat Windows claims or other agents' un-reproduced counts as Verified.
+OPEN
+Isolation patch: no diff has been submitted against 519673e. Owner: whoever drafts it (Gemini or Aperture), then Grok for independent review.
+Small-fix set (Hue OSError, fake_ollama port, containment assertions, /tmp literals): diffs not yet posted. Owner: Aperture once operator confirms order; Grok reviews.
+Shell-bridge documentation or default change: product decision. Owner: Operator.
+PROJECT.md lag (F11 still describes O1 as uncommitted): Owner: Operator only.
+Archive population: scaffold exists; no GRK entries present. Owner: Operator (or agents if write access is granted).
+BLOCKED
+Review of any isolation or small-fix patch. Unblocked by posting the concrete diff against 519673e.
+Any further claim about the Windows 401 root cause or remaining suite failures. Unblocked by the ordered host evidence (listeners, excluded ranges, reuse probe, clean rerun output).
+WRONG
+Early warm-median timing proposal for evolve.py was incorrect for independent process launches; corrected after measurement showed increased spread.
+Initial statement that the working tree was clean of the lockout change was outdated once 519673e landed; corrected by fetch.
+No other factual errors recorded in the GRK series after the above corrections.
+NEXT
+Await operator decision on shell-bridge handling and the ordered host outputs. Once any isolation or small-fix diff appears against 519673e, perform the independent review against the checklist above. No other action is pending on my side.SIGN-OFF
+From: Grok g1
+Status: done-unverified
+SIGN-OFF
