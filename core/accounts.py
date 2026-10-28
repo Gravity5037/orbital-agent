@@ -27,9 +27,11 @@ ACCOUNTS_FILE = os.path.join(config.STATE_DIR, "accounts.json")
 
 SESSION_TTL = 60 * 60 * 12          # 12 hours
 MAX_FAILURES = 10                   # before the IP block
+MAX_ATTEMPTS = 5                    # before the account lock
 ALERT_AT = 5                        # notify at this many failures
 FAIL_WINDOW = 60 * 60               # failures older than this are forgotten
 IP_BLOCK_SECONDS = 60 * 60          # one hour
+ACCOUNT_LOCK_SECONDS = 15 * 60      # fifteen minutes
 DELETE_GRACE_DAYS = 7
 
 OWNER = "owner"
@@ -695,9 +697,34 @@ def _recent(store, key, now=None):
     return stamps
 
 def _check_rate(username, ip=None):
-    """May this attempt proceed? Returns (ok, seconds_to_wait)."""
-    now = time.time()
+    """May this attempt proceed? Returns (ok, seconds_to_wait).
 
+    Two independent locks, and both are needed.
+
+    The account lock exists because the address lock is not sufficient on
+    its own. An attacker rotating addresses never accumulates failures
+    against one IP, so the per-IP block never fires while the guesses
+    continue. Before this, a username could be attacked indefinitely with
+    the correct password still working throughout.
+
+    The account check runs first, so a locked account stays locked even
+    from a fresh address.
+    """
+    now = time.time()
+    key = str(username or "").strip().lower()
+
+    # --- the account lock
+    if key:
+        recent = _recent(_FAILURES, key, now)
+        if len(recent) >= MAX_ATTEMPTS:
+            # The lock lasts ACCOUNT_LOCK_SECONDS from the most recent
+            # failure, so trickling one guess at a time cannot hold it
+            # open, and an idle account releases itself.
+            unlock_at = recent[-1] + ACCOUNT_LOCK_SECONDS
+            if unlock_at > now:
+                return False, int(unlock_at - now)
+
+    # --- the address lock
     if ip:
         until = _IP_BLOCKED.get(ip)
         if until and until > now:
@@ -752,6 +779,13 @@ def _alert(username, reason):
     )
 
 def _clear_failures(username):
+    """Forget a username's failures, which also releases its lock.
+
+    Called on a successful sign-in and by the test suite. Dropping the
+    counter is the whole unlock: _check_rate derives the lock from the
+    counter, so there is no separate lock state that could disagree with
+    it.
+    """
     with _LOCK:
         _FAILURES.pop(str(username or "").strip().lower(), None)
 

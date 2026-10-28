@@ -111,10 +111,22 @@ def main():
             st == 200 and "FAKE-LLM" in body.get("response", ""),
             body.get("response", "")[:60],
         )
+        # Chat routes through core/agent.py so a tool call runs instead
+        # of being printed as text. The agent path sets kind to "agent",
+        # and to "agent-stopped" only when the step budget ran out. This
+        # asserts the specific value rather than accepting a set, so a
+        # reply that silently fell back to the plain handler is caught
+        # instead of tolerated.
+        meta = body.get("meta", {})
         check(
-            "chat metadata marks it as an llm call",
-            body.get("meta", {}).get("kind") == "llm",
-            str(body.get("meta")),
+            "chat is handled by the agent loop",
+            meta.get("kind") == "agent",
+            str(meta),
+        )
+        check(
+            "the agent path reports a tool count",
+            "calls" in meta,
+            str(meta),
         )
 
         # 5
