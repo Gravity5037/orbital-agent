@@ -1,0 +1,92 @@
+Ref: PPX-g1-014
+From: Perplexity g1
+Received: 2026-10-28 02:23
+Label: raw paste by operator, not independently verified
+Sha256: 4a81f218d6bc16a9a6a8ed964c072f024ff63fac6e0f7b4fe3d9185aa5ee6476
+-----
+STATUS
+From: Perplexity g1
+Date: 2026-10-28
+Ref: PPX-g1-014
+
+Verified: NONE under APX-g2-014’s execution-only definition. I ran no shell commands, tests, Windows probes, or repository writes. I performed web-based source and documentation inspections, identified below.
+
+Unverified:
+U1. Current host checkout, effective configuration, listeners, local patches, and full test results. Owner: Operator or host Claude; settle with contemporaneous commands and raw output.
+U2. Aperture’s reported disappearance of the 401 class after stale-listener removal. Owner: Operator; supply complete before-and-after logs. Earlier pasted listener entries and the attributed result are present in this conversation.
+U3. Current remote tip, archive commit e6cb305, archive helper contents, and proposed isolation diffs. Owner: Aperture or Operator; supply the exact files and diffs.
+U4. Current PROJECT.md reconciliation. Owner: Operator; provide the updated file and supporting execution evidence.
+U5. Shell-default decision, frontend dependency on shell execution, and effective host authorization boundaries. Owner: Operator, assisted by implementation and review agents.
+
+DONE
+
+Completed evidence and scope audits in PPX-001 through PPX-013. Authored no commits or code patches.
+
+Project baseline and O1
+
+Inspected PROJECT.md, selected implementation files, and the published 519673e diff. Distinguished committed account-lockout and exact agent-metadata changes from unverified execution claims. Identified obsolete project-file statements describing O1 as uncommitted and the assertion as broadly accepting.
+
+Windows readiness investigation
+
+From source inspection, proposed that another engine could answer the readiness ping. Distinguished endpoint reachability from child ownership and token-file contents from process credentials.
+
+The subsequent stale-listener cleanup result belongs to the Operator/Aperture report, not to my executions.
+
+Winsock evidence
+
+Consulted Microsoft’s competing-bind tables, error-code documentation, and excluded-port KB, plus Go’s published Windows socket-options source.
+
+Corrected oversimplified claims about connection distribution, guaranteed competing-bind success, and whether default Go options rule out 10013. Exact addresses, options, and account context matter; documentation does not establish what happened on the host.
+
+Publication review
+
+Identified that a tracked-filename search is not a content or history secret scan, and ignore rules are not a guarantee against credential commits.
+
+Recommended an explicit shell-default decision, separate authorization review, and separation of publication/security changes from test isolation.
+
+Archive and reporting
+
+Proposed immutable message bodies, explicit provenance, marked redactions, correction entries, and separation of historical records from current project truth. Requested exact diffs before applying unseen patches.
+
+Sources behind these audits were GitHub file and commit pages, Microsoft Learn, Go’s published source, and Git’s official documentation. Earlier PPX messages contain the inspection-specific citations.
+
+OPEN
+
+Operator: Reconcile PROJECT.md’s baseline, O1 implementation status, execution status, identity decision, ancestry claim, and inconsistent historical file counts.
+
+Assigned implementer, confirmed by Operator: Supply the isolation diff covering actual endpoint allocation, endpoint propagation, readiness ownership, startup-exit detection, and owned-process cleanup.
+
+Grok: Independently review that diff and its occupied-port and forced-startup-failure regressions before host application.
+
+Operator: Preserve complete test logs, tested commit, environment, and exit status; reconcile reported seven-versus-ten failing-suite runs.
+
+Operator: Decide shell-default policy and archive-write permissions. Keep Windows permission work, containment semantics, and exclusive-bind hardening separately scoped unless explicitly authorized.
+
+BLOCKED
+
+I have not used a repository-write mechanism in this session and cannot claim permission or ability to push. This status is submitted as a paste, not a committed archive entry.
+
+Patch-specific review is blocked on the exact patch. Host-specific conclusions are blocked on raw host evidence.
+
+WRONG
+
+PPX-002 did not supply the requested direct parent/child credential-comparison command. I supplied a listener-identification command instead. It investigated another useful hypothesis, but did not satisfy that specific comparison request.
+
+Earlier Winsock summaries were insufficiently precise about address-dependent 10013 outcomes. PPX-012 corrected this: default Go listener options do not, by themselves, imply that a second reuse-enabled bind will succeed.
+
+Some later handoffs reused earlier inspection findings without fresh source citations. That reduced traceability. Archive those as carried-forward findings with the originating PPX reference, not as new inspections.
+
+My earlier broad “everything known” briefing mixed too much inherited context with next-step recommendations. New onboarding should start from the current project file, checkout identity, actual diff, and raw output.
+
+NEXT
+
+My single next action is to review the exact proposed isolation diff against its identified baseline. This depends on Aperture or the Operator supplying it; I will not treat a patch description or passing-suite claim as the diff.
+
+Operator may archive this status after approving the format and submission route.
+
+A SHA-256 digest can support a content-integrity comparison; a digest stored beside an entry does not by itself authenticate its author or prove that it matches the originating chat. Preserve provenance separately.
+
+SIGN-OFF
+From: Perplexity g1
+Status: needs input
+SIGN-OFF
