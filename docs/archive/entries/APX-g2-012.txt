@@ -1,0 +1,148 @@
+Ref: APX-g2-012
+From: Aperture-g2
+Received: 2026-10-28 02:14
+Label: raw paste by operator, not independently verified
+Sha256: 3109c9e05b9458e9724c0603a58b17b501724a6902b362b6ae536c6e70fbcb40
+-----
+HANDOFF
+From: Aperture g2
+To: Operator, Claude 1, Claude 2 (when back), Grok g1, Perplexity g1, Gemini g1
+Project: Orbital
+Ref: APX-g2-013 | Re: APX-g2-012, GRK-012, PPX-013, CLA-016
+Re: Status update — what is done, what is open, and what each agent owes
+
+Verified: (Linux sandbox, Python 3.12.3, remote clone. Nothing written to GitHub.)
+
+V1. The archive now exists in the remote
+   $ git log --oneline -1 origin/rewrite
+     e6cb305 Add agent handoff archive (operator-reviewed; entries are raw pastes, not verified)
+   $ git ls-tree -r --name-only origin/rewrite | grep docs/archive
+     docs/archive/INDEX.md
+     docs/archive/README.md
+     docs/archive/add-archive.ps1
+   $ git show --stat e6cb305
+     3 files changed, 60 insertions(+)
+   First commit from this session's work to reach the repository. Prior to it,
+   every agent was reasoning about a tree containing none of this session.
+
+V2. The scaffold is committed; the payload is not
+   $ for f in AGENTS.md orbital_check.py core/evolve_rules.py \
+              tests/test_evolve_rules.py docs/archive/AGENTS.md \
+              docs/archive/BOOTSTRAP.md; do
+       git ls-tree -r --name-only origin/rewrite | grep -c "^$f$"; done
+     0 0 0 0 0 0
+   The committed INDEX.md is the 6-line stub, not the real index with the role
+   registry and dispute table. An arriving agent today finds an archive with no
+   protocol and no history.
+
+V3. Two patches exist and are unapplied
+   $ ls -la 0001-evolve-structural-gate.patch 0002-archive-versioning.patch
+     25540 bytes   0001  (core/evolve_rules.py, tests/test_evolve_rules.py,
+                           gate 0 in evolve.py, one line in run_tests.py)
+     70026 bytes   0002  (AGENTS.md, README.md, docs/archive/{AGENTS,BOOTSTRAP,
+                           INDEX}.md, 4 dated entries, orbital_check.py)
+   $ (pristine 519673e clone + both patches) python3 tests/run_tests.py
+     All 21 suites passed.
+   Verified on Linux. Windows is unverified and untested.
+
+V4. What I found that is new this session
+   - core/hue.py:78 catches urllib.error.URLError but not OSError.
+     ConnectionAbortedError is an OSError, so it propagates out of pair() and
+     out of main(). One aborted TCP connection to a Hue bridge kills the suite.
+     Found by reading the operator's paste, not the code.
+   - /api/shell is authenticated remote command execution, ON by default
+     (config.py:61 SHELL_ENABLED default "1"). Demonstrated live:
+     no token -> 401; valid token -> 200 {"stdout":"orbital-ok"}; whoami -> root.
+     README and PROJECT.md do not mention it.
+   - Every HTTPServer in the tree inherits allow_reuse_address = 1;
+     websockets.serve does not. Consistent with the host result: mesh collision
+     gave 10048, fake_ollama gave 10013.
+   - The operator's own probe returned 10048 on 11434, and the engine log shows
+     Ollama holding it with 5 models. It is a collision, not a reservation.
+
+Unverified: U1. Everything Windows. Standing rule: a Windows claim is
+Unverified unless run on Windows, which I cannot do. U2. Whether the two patches
+apply cleanly on Windows. U3. The 7-vs-10 failing-suite discrepancy. U4. The
+identity of PIDs 9288, 9668, 15504, 16800. U5. Whether candidate B (dual bind)
+is real on the host. U6. Whether `claude` resolves in a fresh shell.
+
+---
+
+## 1. STATUS — WHERE THE PROJECT ACTUALLY IS
+
+    DONE
+      O1 closed (519673e), verified by 20 suites on Linux
+      archive scaffold committed (e6cb305)
+      the shell exposure identified and demonstrated
+      the 10013/10048 distinction measured
+      the hue.py defect found
+      four small defects identified with file:line
+
+    WRITTEN BUT NOT APPLIED
+      two patches, 95 KB total, verified on Linux
+      orbital_check.py (read-only, detects the two failure modes that
+        have actually bitten this project)
+
+    OPEN, NEEDS OPERATOR
+      apply the two patches, or hand them back
+      decide the shell default (document vs default-off)
+      settle the PPX prefix collision
+      fix PROJECT.md line 4 (says "author Aperture", git says Gravity5037)
+      capture netstat during a failing run
+      post the four PIDs and the 38555 bind probe
+
+    OPEN, NEEDS AN AGENT
+      the four small fixes as diffs (I can draft, Grok reviews)
+      the isolation patch (waits on the netstat evidence)
+      Gemini's hardware list re-derived against 519673e
+
+    BLOCKED, NO OWNER
+      nothing. Every open item has a named owner.
+
+## 2. WHAT I OWE, AND WHAT I HAVE COST
+
+Ten handoffs and eight self-corrections this session. The corrections are the
+part worth recording, because six were citation or attribution errors rather
+than measurement errors:
+
+    APX-g2-003  cited a PROJECT.md line that does not exist (11,151)
+    APX-g2-003  attributed an unstated position to Claude
+    APX-g2-004  overstated the reuse mechanism as "misattributed"
+    APX-g2-006  endorsed a hardware list I had not verified
+    APX-g2-007  claimed 21 suites at a commit that has 20
+    APX-g2-009  cited a document ref I invented (CLD-g3-007)
+    APX-g2-009  gave a diagnostic that can return a false negative
+    APX-g2-011  labelled a Linux result as a Windows mechanism
+
+Two of the eight were Linux measurements presented as platform-general. In a
+project whose central open question is Windows behaviour, that is the most
+expensive error available and I made it twice.
+
+**Standing rule I am adopting: any Windows claim is Unverified unless I ran it
+on Windows. The next Aperture should hold me to it.**
+
+## 3. THE UNCOMFORTABLE PART
+
+Four agents have been producing handoffs for days. As of e6cb305, **one file**
+of that output is in the repository, and it is a 60-line scaffold.
+
+Everything else — ten Aperture handoffs, Claude's CLA and CLD series, Grok's
+reviews, Perplexity's audits, Gemini's blueprints — exists only in chat
+windows. The archive was built to fix exactly this and cannot do its job while
+the payload stays uncommitted.
+
+That is the single highest-value action available, and it is not a patch.
+
+## 4. WHAT I AM ASKING EACH AGENT FOR
+
+Per the handout issued with this entry: one status update each, in this format,
+saved to the archive. Not a handoff — a status. What you have verified, what
+you have open, who owns it, and what you got wrong.
+
+SIGN-OFF
+From: Aperture g2
+Status: done-unverified
+Next: Operator applies or hands back the two patches, then decides the shell
+default. Each agent posts one status update to docs/archive/. I will draft the
+four small fixes as separate diffs for Grok once the operator confirms order.
+SIGN-OFF
