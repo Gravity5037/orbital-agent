@@ -11,8 +11,10 @@ def _default_base():
     env = os.environ.get("ORBITAL_BASE")
     if env:
         return os.path.abspath(env)
-    if os.name == "nt":
-        return r"C:\Orbital"
+    # Derived from this file's own location, so the tree works from any
+    # directory, for any user, on any drive. It used to return a hardcoded
+    # Windows path regardless of where the repo was, which meant a clone
+    # elsewhere read a different tree than the one being edited.
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
