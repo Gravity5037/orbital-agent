@@ -1548,7 +1548,6 @@ def serve():
     token = auth.get_token()
     ok, detail = nucleus.health(timeout=2)
 
-    log.info(f"Engine listening on http://{config.ENGINE_HOST}:{config.ENGINE_PORT}")
     log.info(f"Token file: {config.TOKEN_FILE}")
     if ok:
         log.info(f"Nucleus reachable at {config.OLLAMA_BASE} — models: {detail or 'none'}")
@@ -1583,6 +1582,12 @@ def serve():
 
     httpd = ThreadingHTTPServer((config.ENGINE_HOST, config.ENGINE_PORT), Handler)
     httpd.daemon_threads = True
+    # Logged AFTER the bind, and from the bound socket. Printing this
+    # before the bind reported an intention as a fact: a child that died
+    # on EADDRINUSE had already written "Engine listening", which made a
+    # failed start indistinguishable from a successful one.
+    _host, _port = httpd.server_address[0], httpd.server_address[1]
+    log.info(f"Engine listening on http://{_host}:{_port}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

@@ -72,14 +72,44 @@ def main():
             )
         )
 
-        # wait for the engine to bind
+        # Wait for the engine to bind.
+        #
+        # The old loop accepted a 200 from ANY process on 5000. If the child
+        # died at bind -- which it does whenever something else holds the
+        # port -- a stale engine from an earlier run answered the ping, and
+        # the test then ran against a process that had never seen its token.
+        # Every token-bearing call returned 401 and the cause looked like an
+        # auth bug. Check the child is alive before trusting the response.
+        engine = procs[-1]
+
+        # Give the child a moment to fail. A child that cannot bind dies in
+        # well under a second; a healthy one needs longer than that to come
+        # up. Checking before the ping means a dead child is caught on its
+        # first iteration instead of being masked by a stale responder.
+        time.sleep(1.0)
+
+        ready = False
         for _ in range(40):
-            time.sleep(0.25)
+            if engine.poll() is not None:
+                raise SystemExit(
+                    "the engine child exited during startup with code "
+                    f"{engine.returncode}. Something else is on port 5000.\n"
+                    "Find it with:  netstat -ano | findstr :5000"
+                )
             try:
                 req("/api/ping")
+                ready = True
                 break
             except Exception:
+                time.sleep(0.25)
                 continue
+        if not ready:
+            raise SystemExit("the engine never answered /api/ping")
+        if engine.poll() is not None:
+            raise SystemExit(
+                "the engine child died just after answering /api/ping - "
+                "the response came from another process"
+            )
 
         sys.path.insert(0, ROOT)
         from core import auth
